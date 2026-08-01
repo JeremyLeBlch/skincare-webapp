@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker network *)",
+      "Bash(find \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\jlebo\\\\dev\\\\skincare\\\\app\" -maxdepth 3)"
+    ]
+  }
+}

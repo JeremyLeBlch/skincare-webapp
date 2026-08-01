@@ -1,0 +1,62 @@
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Instrument+Serif:ital@0;1&display=swap");
+@import "tailwindcss";
+
+/*
+ * Design tokens ported from the "Modernist" design system, Forest direction
+ * (Claude Design project, see the _ds folder for the source styles.css).
+ * Tailwind v4 turns each --color- and --font- entry below into utilities
+ * automatically (bg-accent, text-ink/55, font-heading, ...).
+ * Ramp steps not given by the source design (e.g. accent-400/900) are
+ * interpolated to stay on the same lightness scale as the given steps.
+ */
+@theme {
+  --color-bg: #f7f2e9;
+  --color-surface: #efe7d9;
+  --color-ink: #241f19;
+  --color-accent: #2f5741;
+  --color-accent-2: #8a5a3b;
+
+  --color-neutral-100: #f4eee3;
+  --color-neutral-200: #ece4d6;
+  --color-neutral-300: #ded3c2;
+  --color-neutral-400: #c7b9a3;
+  --color-neutral-500: #a89a82;
+  --color-neutral-600: #8a7c66;
+  --color-neutral-700: #6b6052;
+  --color-neutral-800: #4f473b;
+  --color-neutral-900: #332e26;
+
+  --color-accent-100: #e7efe9;
+  --color-accent-200: #d5e3d9;
+  --color-accent-300: #b5cebf;
+  --color-accent-400: #7fa38d;
+  --color-accent-500: #4c7660;
+  --color-accent-600: #254634;
+  --color-accent-700: #1b3427;
+  --color-accent-800: #15281e;
+  --color-accent-900: #0d1913;
+
+  --color-accent-2-100: #f2e6da;
+  --color-accent-2-200: #e6d2bd;
+  --color-accent-2-300: #d9bc9d;
+  --color-accent-2-400: #c29b74;
+  --color-accent-2-500: #8a5a3b;
+  --color-accent-2-600: #74492f;
+  --color-accent-2-700: #5e3a26;
+  --color-accent-2-800: #4a2e1c;
+  --color-accent-2-900: #342013;
+
+  --font-heading: "Instrument Serif", serif;
+  --font-body: "Archivo", system-ui, sans-serif;
+
+  /* Soft, rounded shapes — buttons/tags use Tailwind's built-in rounded-full */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 26px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}

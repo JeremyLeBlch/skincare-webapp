@@ -1,0 +1,25 @@
+services:
+  web:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "3000:3000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3000
+      # SSR (server-side) calls reach the API container directly over the shared network.
+      - NUXT_API_BASE=http://laravel.test
+      # Browser calls hit the API's published port on the host.
+      - NUXT_PUBLIC_API_BASE=http://localhost
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - default
+      - skincare-api
+
+networks:
+  skincare-api:
+    name: skincare-api_sail
+    external: true
