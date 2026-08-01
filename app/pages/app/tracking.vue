@@ -1,6 +1,12 @@
 <script setup lang="ts">
-const { suivi } = await useSuivi()
+import type { TrackingPhoto } from '~/composables/useTracking'
+
+const { tracking } = await useTracking()
 const { account } = await useAccount()
+
+function photoStyle(photo: TrackingPhoto | null | undefined, fallback: string) {
+  return photo?.photoUrl ? { backgroundImage: `url("${photo.photoUrl}")` } : { background: fallback }
+}
 
 const rangeOptions = [
   { label: 'Mois', value: 'month' },
@@ -12,7 +18,7 @@ const range = ref('12w')
 const weekdayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 const moodPoints = computed(() => {
-  const trend = suivi.value?.moodTrend ?? []
+  const trend = tracking.value?.moodTrend ?? []
   if (trend.length < 2) return ''
   const step = 320 / (trend.length - 1)
   return trend.map((t, i) => `${Math.round(i * step)},${15 + (t.value - 1) * 60}`).join(' ')
@@ -30,12 +36,12 @@ async function onExport() {
 </script>
 
 <template>
-  <div v-if="suivi" class="flex flex-1 flex-col lg:min-h-0">
+  <div v-if="tracking" class="flex flex-1 flex-col lg:min-h-0">
     <!-- Mobile (< lg) -->
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="flex items-baseline justify-between px-[22px] pt-3.5">
         <h3 class="font-heading text-[25px] font-normal">Mon suivi</h3>
-        <TagBadge variant="accent">{{ suivi.streak }} jours</TagBadge>
+        <TagBadge variant="accent">{{ tracking.streak }} jours</TagBadge>
       </div>
 
       <div class="flex-1 overflow-auto px-[22px] pt-4 pb-6">
@@ -43,7 +49,7 @@ async function onExport() {
           <div class="grid grid-cols-7 gap-1.5">
             <div v-for="d in weekdayLabels" :key="d" class="text-center text-[11px] text-ink/45">{{ d }}</div>
             <div
-              v-for="(cell, i) in suivi.cells"
+              v-for="(cell, i) in tracking.cells"
               :key="i"
               class="grid aspect-square place-items-center rounded-full text-[10px] font-semibold"
               :class="{
@@ -63,20 +69,47 @@ async function onExport() {
           </div>
         </div>
 
-        <div class="mt-3.5 flex gap-2.5">
-          <div class="flex h-[130px] flex-1 items-start rounded-lg p-2.5 text-[10px] font-semibold text-ink/55" style="background: linear-gradient(140deg, #d3c7b2, #bdb098)">
-            Départ · J1
+        <div v-if="tracking.startPhoto" class="mt-3.5 flex gap-2.5">
+          <div
+            class="flex h-[130px] flex-1 items-start rounded-lg bg-cover bg-center p-2.5"
+            :style="photoStyle(tracking.startPhoto, 'linear-gradient(140deg, #d3c7b2, #bdb098)')"
+          >
+            <span class="rounded-full bg-bg/85 px-2 py-[3px] text-[10px] font-semibold text-ink/60">
+              Départ · {{ tracking.startPhoto.label }}
+            </span>
           </div>
-          <div class="flex h-[130px] flex-1 items-start rounded-lg p-2.5 text-[10px] font-semibold text-ink/55" style="background: linear-gradient(140deg, #e8dfd0, #d6cab5)">
-            Auj. · J24
+          <div
+            v-if="tracking.latestPhoto"
+            class="flex h-[130px] flex-1 items-start rounded-lg bg-cover bg-center p-2.5"
+            :style="photoStyle(tracking.latestPhoto, 'linear-gradient(140deg, #e8dfd0, #d6cab5)')"
+          >
+            <span class="rounded-full bg-bg/85 px-2 py-[3px] text-[10px] font-semibold text-ink/60">
+              Auj. · {{ tracking.latestPhoto.label }}
+            </span>
+          </div>
+          <div v-else class="grid h-[130px] flex-1 place-items-center rounded-lg border-2 border-dashed border-ink/20 p-2.5 text-center text-[10px] font-semibold text-ink/45">
+            Votre prochaine photo apparaîtra ici
           </div>
         </div>
-        <BaseButton variant="secondary" block class="mt-2.5" @click="$router.push('/app/compare')">Comparer en grand</BaseButton>
+        <InfoNote v-else class="mt-3.5">
+          Vos photos apparaîtront ici dès votre première entrée avec photo.
+        </InfoNote>
+        <BaseButton variant="secondary" block class="mt-2.5" :disabled="!tracking.startPhoto" @click="$router.push('/app/compare')">Comparer en grand</BaseButton>
+
+        <template v-if="tracking.strip.length">
+          <EyebrowLabel class="mt-[22px]">Mes photos</EyebrowLabel>
+          <div class="mt-3 flex gap-2.5 overflow-x-auto pb-1">
+            <div v-for="s in tracking.strip" :key="s.label" class="w-[84px] flex-none">
+              <div class="h-[110px] rounded-lg bg-cover bg-center" :style="photoStyle(s, '#d6cab5')" />
+              <div class="mt-1.5 text-[11px] text-ink/50">{{ s.label }}</div>
+            </div>
+          </div>
+        </template>
 
         <EyebrowLabel class="mt-[22px]">Jalons</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-2">
           <div
-            v-for="m in suivi.milestones"
+            v-for="m in tracking.milestones"
             :key="m.label"
             class="flex items-center gap-3"
             :class="[m.state === 'current' ? 'rounded-lg bg-accent-100 px-3.5 py-3' : '', m.state === 'pending' ? 'opacity-50' : '']"
@@ -112,11 +145,11 @@ async function onExport() {
           </div>
         </div>
 
-        <div v-if="suivi.strip.length" class="mt-5 grid grid-cols-8 gap-2.5">
-          <div v-for="s in suivi.strip" :key="s.label">
+        <div v-if="tracking.strip.length" class="mt-5 grid grid-cols-8 gap-2.5">
+          <div v-for="s in tracking.strip" :key="s.label">
             <div
               class="h-[112px] rounded-[20px] bg-cover bg-center"
-              :style="s.photoUrl ? { backgroundImage: `url(${s.photoUrl})` } : 'background: #d6cab5'"
+              :style="photoStyle(s, '#d6cab5')"
             />
             <div class="mt-1.5 text-[11px] text-ink/50">{{ s.label }}</div>
           </div>
@@ -144,13 +177,13 @@ async function onExport() {
           <div class="w-[300px] flex-none">
             <EyebrowLabel>Observance</EyebrowLabel>
             <div class="mt-3.5 flex flex-col gap-3">
-              <div v-for="a in suivi.adherence" :key="a.label" class="flex justify-between text-sm">
+              <div v-for="a in tracking.adherence" :key="a.label" class="flex justify-between text-sm">
                 <span>{{ a.label }}</span>
                 <span class="font-semibold">{{ a.value }}</span>
               </div>
             </div>
             <div class="mt-[18px] rounded-lg bg-surface p-4 text-[12.5px] leading-relaxed">
-              Série actuelle : <strong>{{ suivi.streak }} jours</strong>. Record : {{ suivi.record }} jours.
+              Série actuelle : <strong>{{ tracking.streak }} jours</strong>. Record : {{ tracking.record }} jours.
             </div>
           </div>
         </div>
@@ -158,7 +191,7 @@ async function onExport() {
 
       <div class="flex flex-col gap-3.5 overflow-auto p-6">
         <EyebrowLabel>Ce qu'on vous conseille cette semaine</EyebrowLabel>
-        <AdviceCard v-for="card in suivi.adviceCards" :key="card.title" v-bind="card" />
+        <AdviceCard v-for="card in tracking.adviceCards" :key="card.title" v-bind="card" />
         <hr class="border-t border-ink/16">
         <EyebrowLabel muted>Rappel</EyebrowLabel>
         <p class="text-[12.5px] leading-relaxed text-ink/70">

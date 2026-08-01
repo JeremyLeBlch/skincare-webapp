@@ -13,7 +13,11 @@ defineProps<{ days: RecentDay[] }>()
       >
         {{ day.placeholderLabel }}
       </div>
-      <div v-else class="h-[100px] rounded-lg" :style="{ background: day.shade }" />
+      <div
+        v-else
+        class="h-[100px] rounded-lg bg-cover bg-center"
+        :style="day.photoUrl ? { backgroundImage: `url('${day.photoUrl}')` } : { background: day.shade }"
+      />
       <figcaption class="mt-1 text-[11px] text-ink/55">{{ day.caption }}</figcaption>
     </figure>
   </div>

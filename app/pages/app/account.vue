@@ -175,7 +175,7 @@ async function handleLogout() {
       <div class="flex items-center gap-5">
         <span
           class="h-[84px] w-[84px] flex-none rounded-full bg-cover bg-center"
-          :style="account.avatarUrl ? { backgroundImage: `url(${account.avatarUrl})` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
+          :style="account.avatarUrl ? { backgroundImage: `url('${account.avatarUrl}')` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
         />
         <div class="flex-1">
           <h1 class="font-heading text-[32px] font-normal lg:text-[40px]">{{ account.firstName }} {{ account.lastName }}</h1>

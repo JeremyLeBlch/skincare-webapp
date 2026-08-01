@@ -36,9 +36,12 @@ export async function useEntry() {
     if (payload.symptoms) payload.symptoms.forEach((s) => form.append('symptoms[]', s))
     if (payload.note !== undefined && payload.note !== null) form.append('note', payload.note)
     if (payload.skipped !== undefined) form.append('skipped', payload.skipped ? '1' : '0')
-    if (payload.photoFace) form.append('photo_face', payload.photoFace)
-    if (payload.photoLeft) form.append('photo_left', payload.photoLeft)
-    if (payload.photoRight) form.append('photo_right', payload.photoRight)
+
+    // Camera originals are far too heavy for both the API limit and a mobile
+    // connection — downscale before they hit the wire.
+    if (payload.photoFace) form.append('photo_face', await compressImage(payload.photoFace))
+    if (payload.photoLeft) form.append('photo_left', await compressImage(payload.photoLeft))
+    if (payload.photoRight) form.append('photo_right', await compressImage(payload.photoRight))
 
     entry.value = await apiFetch<EntryData>('/entries', { method: 'POST', body: form })
     return entry.value

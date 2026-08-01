@@ -8,6 +8,7 @@ const angles = ['Face', 'Profil G', 'Profil D']
 const angle = ref('Face')
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
+const photoError = ref<string | null>(null)
 
 const angleKey = computed(() => ({ Face: 'photoFace', 'Profil G': 'photoLeft', 'Profil D': 'photoRight' })[angle.value] as 'photoFace' | 'photoLeft' | 'photoRight')
 
@@ -16,15 +17,21 @@ function openCamera() {
 }
 
 async function onFileSelected(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
   if (!file) return
 
   uploading.value = true
+  photoError.value = null
   try {
     await save({ [angleKey.value]: file })
     router.push('/app/entry')
+  } catch {
+    photoError.value = "L'envoi a échoué. Vérifiez votre connexion et réessayez."
   } finally {
     uploading.value = false
+    // Let the same shot be retried: an unchanged input value fires no `change`.
+    input.value = ''
   }
 }
 </script>
@@ -45,6 +52,10 @@ async function onFileSelected(event: Event) {
       </div>
 
       <div class="mt-auto px-6 pb-[30px]">
+        <div v-if="photoError" class="mb-[18px] rounded-[22px] p-4 text-[12.5px] leading-relaxed" style="background: rgba(190, 90, 70, 0.35)">
+          {{ photoError }}
+        </div>
+
         <div class="mb-[18px] rounded-[22px] p-4 text-[12.5px] leading-relaxed" style="background: rgba(247, 242, 233, 0.12)">
           Alignez-vous sur le contour de <strong>votre photo d'hier</strong>. Même lumière, même distance — c'est ce
           qui rend la comparaison honnête.

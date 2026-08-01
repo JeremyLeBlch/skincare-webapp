@@ -26,15 +26,24 @@ const faceInput = ref<HTMLInputElement | null>(null)
 const leftInput = ref<HTMLInputElement | null>(null)
 const rightInput = ref<HTMLInputElement | null>(null)
 const uploadingAngle = ref<string | null>(null)
+const photoError = ref<string | null>(null)
 
 async function onAnglePhoto(angle: 'photoFace' | 'photoLeft' | 'photoRight', event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
   if (!file) return
+
   uploadingAngle.value = angle
+  photoError.value = null
   try {
     await save({ [angle]: file })
+  } catch {
+    photoError.value = "L'envoi de la photo a échoué. Vérifiez votre connexion et réessayez."
   } finally {
     uploadingAngle.value = null
+    // Let the same file be picked again after a failure — without this the
+    // input keeps its value and re-selecting it fires no `change` event.
+    input.value = ''
   }
 }
 
@@ -76,7 +85,7 @@ async function skipToday() {
       <div class="flex gap-2.5 px-[22px] pt-4">
         <div
           class="flex h-[180px] flex-1 items-end justify-start rounded-lg bg-cover bg-center p-2.5 text-[10px] font-semibold text-ink/55"
-          :style="entry?.photos.face ? { backgroundImage: `url(${entry.photos.face})` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
+          :style="entry?.photos.face ? { backgroundImage: `url('${entry.photos.face}')` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
         >
           Face · aujourd'hui
         </div>
@@ -84,7 +93,7 @@ async function skipToday() {
           <button
             type="button"
             class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 bg-cover bg-center text-center text-[10px] font-semibold text-ink/45"
-            :style="entry?.photos.left ? { backgroundImage: `url(${entry.photos.left})` } : ''"
+            :style="entry?.photos.left ? { backgroundImage: `url('${entry.photos.left}')` } : ''"
             :disabled="uploadingAngle === 'photoLeft'"
             @click="leftInput?.click()"
           >
@@ -93,7 +102,7 @@ async function skipToday() {
           <button
             type="button"
             class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 bg-cover bg-center text-center text-[10px] font-semibold text-ink/45"
-            :style="entry?.photos.right ? { backgroundImage: `url(${entry.photos.right})` } : ''"
+            :style="entry?.photos.right ? { backgroundImage: `url('${entry.photos.right}')` } : ''"
             :disabled="uploadingAngle === 'photoRight'"
             @click="rightInput?.click()"
           >
@@ -101,6 +110,7 @@ async function skipToday() {
           </button>
         </div>
       </div>
+      <InfoNote v-if="photoError" tone="accent-2" class="mx-[22px] mt-2.5">{{ photoError }}</InfoNote>
       <input ref="faceInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoFace', $event)">
       <input ref="leftInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoLeft', $event)">
       <input ref="rightInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoRight', $event)">
@@ -164,7 +174,7 @@ async function skipToday() {
             <button
               type="button"
               class="flex items-end justify-end rounded-lg bg-cover bg-center p-2.5"
-              :style="entry?.photos.face ? { backgroundImage: `url(${entry.photos.face})` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
+              :style="entry?.photos.face ? { backgroundImage: `url('${entry.photos.face}')` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
               @click="faceInput?.click()"
             >
               <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[10px] font-semibold text-ink/55">Face</span>
@@ -173,7 +183,7 @@ async function skipToday() {
               <button
                 type="button"
                 class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 bg-cover bg-center text-ink/50"
-                :style="entry?.photos.left ? { backgroundImage: `url(${entry.photos.left})` } : ''"
+                :style="entry?.photos.left ? { backgroundImage: `url('${entry.photos.left}')` } : ''"
                 @click="leftInput?.click()"
               >
                 <template v-if="!entry?.photos.left">
@@ -184,7 +194,7 @@ async function skipToday() {
               <button
                 type="button"
                 class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 bg-cover bg-center text-ink/50"
-                :style="entry?.photos.right ? { backgroundImage: `url(${entry.photos.right})` } : ''"
+                :style="entry?.photos.right ? { backgroundImage: `url('${entry.photos.right}')` } : ''"
                 @click="rightInput?.click()"
               >
                 <template v-if="!entry?.photos.right">
@@ -194,6 +204,8 @@ async function skipToday() {
               </button>
             </div>
           </div>
+
+          <InfoNote v-if="photoError" tone="accent-2" class="mt-4">{{ photoError }}</InfoNote>
 
           <InfoNote tone="accent" class="mt-4">
             <strong>Même lumière, même distance.</strong> Photographiez-vous dans les mêmes conditions que la veille

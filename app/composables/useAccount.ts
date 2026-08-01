@@ -52,7 +52,7 @@ export async function useAccount() {
 
   async function uploadAvatar(file: File) {
     const form = new FormData()
-    form.append('avatar', file)
+    form.append('avatar', await compressImage(file, { maxDimension: 512, maxBytes: 150 * 1024 }))
     const result = await apiFetch<{ avatarUrl: string }>('/account/avatar', { method: 'POST', body: form })
     if (account.value) account.value.avatarUrl = result.avatarUrl
     return result

@@ -7,7 +7,7 @@ const angleOptions = [
 const angle = ref('face')
 
 const { compare } = await useCompare(angle)
-const { suivi } = await useSuivi()
+const { tracking } = await useTracking()
 
 const pos = ref(46)
 const clipBefore = computed(() => `inset(0 ${100 - pos.value}% 0 0)`)
@@ -24,11 +24,11 @@ const handleLeft = computed(() => `${pos.value}%`)
       </div>
 
       <div v-if="compare?.startPhotoUrl && compare?.latestPhotoUrl" class="relative mx-[22px] mt-4 h-[390px] overflow-hidden rounded-lg" style="background: #d6cab5">
-        <div class="absolute inset-0 flex items-start justify-end bg-cover bg-center p-2.5" :style="{ backgroundImage: `url(${compare.latestPhotoUrl})` }">
+        <div class="absolute inset-0 flex items-start justify-end bg-cover bg-center p-2.5" :style="{ backgroundImage: `url('${compare.latestPhotoUrl}')` }">
           <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[11px] font-semibold">Aujourd'hui · {{ compare.todayLabel }}</span>
         </div>
         <div class="absolute inset-0" :style="{ clipPath: clipBefore }">
-          <div class="absolute inset-0 flex items-start bg-cover bg-center p-2.5" :style="{ backgroundImage: `url(${compare.startPhotoUrl})` }">
+          <div class="absolute inset-0 flex items-start bg-cover bg-center p-2.5" :style="{ backgroundImage: `url('${compare.startPhotoUrl}')` }">
             <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[11px] font-semibold">Départ · {{ compare.startLabel }}</span>
           </div>
         </div>
@@ -75,11 +75,11 @@ const handleLeft = computed(() => `${pos.value}%`)
         </div>
 
         <div v-if="compare?.startPhotoUrl && compare?.latestPhotoUrl" class="relative mt-4 min-h-0 flex-1 overflow-hidden rounded-lg" style="background: #d6cab5">
-          <div class="absolute inset-0 flex items-start justify-end bg-cover bg-center p-2.5" :style="{ backgroundImage: `url(${compare.latestPhotoUrl})` }">
+          <div class="absolute inset-0 flex items-start justify-end bg-cover bg-center p-2.5" :style="{ backgroundImage: `url('${compare.latestPhotoUrl}')` }">
             <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[11px] font-semibold">Aujourd'hui · {{ compare.todayLabel }}</span>
           </div>
           <div class="absolute inset-0" :style="{ clipPath: clipBefore }">
-            <div class="absolute inset-0 flex items-start bg-cover bg-center p-2.5" :style="{ backgroundImage: `url(${compare.startPhotoUrl})` }">
+            <div class="absolute inset-0 flex items-start bg-cover bg-center p-2.5" :style="{ backgroundImage: `url('${compare.startPhotoUrl}')` }">
               <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[11px] font-semibold">Départ · {{ compare.startLabel }}</span>
             </div>
           </div>
@@ -94,9 +94,9 @@ const handleLeft = computed(() => `${pos.value}%`)
           Ajoutez au moins deux photos pour cet angle afin de voir la comparaison avant / après.
         </InfoNote>
 
-        <div v-if="suivi?.strip.length" class="mt-3.5 grid grid-cols-8 gap-2">
-          <div v-for="s in suivi.strip" :key="s.label">
-            <div class="h-[66px] rounded-md bg-cover bg-center" :style="s.photoUrl ? { backgroundImage: `url(${s.photoUrl})` } : 'background: #d6cab5'" />
+        <div v-if="tracking?.strip.length" class="mt-3.5 grid grid-cols-8 gap-2">
+          <div v-for="s in tracking.strip" :key="s.label">
+            <div class="h-[66px] rounded-md bg-cover bg-center" :style="s.photoUrl ? { backgroundImage: `url('${s.photoUrl}')` } : 'background: #d6cab5'" />
             <div class="mt-1 text-[11px] text-ink/50">{{ s.label }}</div>
           </div>
         </div>
@@ -123,7 +123,7 @@ const handleLeft = computed(() => `${pos.value}%`)
         <EyebrowLabel class="mt-6">Jalons</EyebrowLabel>
         <div class="mt-3.5 flex flex-col gap-3">
           <div
-            v-for="m in suivi?.milestones ?? []"
+            v-for="m in tracking?.milestones ?? []"
             :key="m.label"
             class="flex items-center gap-3"
             :class="[m.state === 'current' ? 'rounded-lg bg-accent-100 px-3.5 py-3' : '', m.state === 'pending' ? 'opacity-50' : '']"
