@@ -1,9 +1,22 @@
 <script setup lang="ts">
-const advice = useAdvice()
+const route = useRoute()
+const slug = computed(() => (route.query.slug as string) || DEFAULT_ADVICE_SLUG)
+
+const { advice, apply } = await useAdvice(slug)
+
+const applying = ref(false)
+async function onApply() {
+  applying.value = true
+  try {
+    await apply()
+  } finally {
+    applying.value = false
+  }
+}
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col lg:min-h-0">
+  <div v-if="advice" class="flex flex-1 flex-col lg:min-h-0">
     <!-- Mobile (< lg) -->
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="flex items-center gap-3 px-[22px] pt-3">
@@ -48,8 +61,8 @@ const advice = useAdvice()
         <div class="mt-3.5 flex flex-col gap-1.5">
           <NuxtLink
             v-for="item in advice.related"
-            :key="item.label"
-            to="/app/advice"
+            :key="item.slug"
+            :to="{ path: '/app/advice', query: { slug: item.slug } }"
             class="rounded-full px-3.5 py-2.5 text-[13.5px]"
             :class="item.active ? 'bg-accent font-semibold text-bg' : 'text-ink'"
           >
@@ -98,15 +111,19 @@ const advice = useAdvice()
           <div class="text-[10px] tracking-wide text-accent uppercase">{{ advice.suggestion.kicker }}</div>
           <div class="font-heading text-[17px] font-normal leading-tight">{{ advice.suggestion.title }}</div>
           <p class="text-[13px] text-ink/80">{{ advice.suggestion.body }}</p>
-          <BaseButton variant="primary" block class="mt-1.5">Appliquer</BaseButton>
+          <BaseButton variant="primary" block class="mt-1.5" :disabled="applying" @click="onApply">
+            {{ applying ? 'Application…' : 'Appliquer' }}
+          </BaseButton>
         </div>
 
-        <EyebrowLabel muted>Concerné dans votre routine</EyebrowLabel>
-        <div class="flex items-center gap-3 rounded-lg bg-surface p-3.5">
-          <div class="h-11 w-11 flex-none rounded-md" style="background: linear-gradient(140deg, #e0d5c4, #c9bda8)" />
-          <div class="text-[13.5px] font-semibold">{{ advice.relatedProduct }}</div>
-        </div>
-        <p class="text-[12.5px] leading-relaxed text-ink/65">{{ advice.relatedNote }}</p>
+        <template v-if="advice.relatedProduct">
+          <EyebrowLabel muted>Concerné dans votre routine</EyebrowLabel>
+          <div class="flex items-center gap-3 rounded-lg bg-surface p-3.5">
+            <div class="h-11 w-11 flex-none rounded-md" style="background: linear-gradient(140deg, #e0d5c4, #c9bda8)" />
+            <div class="text-[13.5px] font-semibold">{{ advice.relatedProduct }}</div>
+          </div>
+        </template>
+        <p v-if="advice.relatedNote" class="text-[12.5px] leading-relaxed text-ink/65">{{ advice.relatedNote }}</p>
       </div>
     </div>
   </div>

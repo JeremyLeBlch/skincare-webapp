@@ -2,30 +2,63 @@
 definePageMeta({ layout: 'blank' })
 
 const router = useRouter()
+const { entry, save } = await useEntry()
 
 const moodOptions = [
   { label: 'Mieux', value: 'better' },
   { label: 'Pareil', value: 'same' },
   { label: 'Moins bien', value: 'worse' },
 ]
-const mood = ref('same')
+const mood = ref(entry.value?.mood ?? 'same')
 
-const feelingTags = [
-  { label: 'Tiraillements', variant: 'accent' },
-  { label: 'Rougeurs', variant: 'neutral' },
-  { label: 'Desquamation', variant: 'accent' },
-  { label: 'Démangeaisons', variant: 'neutral' },
-  { label: 'Nouveau bouton', variant: 'neutral' },
-  { label: '+ autre', variant: 'outline' },
-] as const
+const feelingLabels = ['Tiraillements', 'Rougeurs', 'Desquamation', 'Démangeaisons', 'Nouveau bouton']
+const selectedSymptoms = ref<string[]>([...(entry.value?.symptoms ?? [])])
 
-const note = ref("Peau qui pèle sur le menton depuis 2 jours, j'ai sauté la trétinoïne hier soir.")
+function toggleSymptom(label: string) {
+  const i = selectedSymptoms.value.indexOf(label)
+  if (i === -1) selectedSymptoms.value.push(label)
+  else selectedSymptoms.value.splice(i, 1)
+}
 
-const eveningChecklist = [
-  { label: 'Nettoyant', done: true },
-  { label: 'Trétinoïne 0,025 %', done: false, tag: { label: 'prévu', variant: 'accent-2' as const } },
-  { label: 'Crème céramides', done: false },
-]
+const note = ref(entry.value?.note ?? '')
+
+const faceInput = ref<HTMLInputElement | null>(null)
+const leftInput = ref<HTMLInputElement | null>(null)
+const rightInput = ref<HTMLInputElement | null>(null)
+const uploadingAngle = ref<string | null>(null)
+
+async function onAnglePhoto(angle: 'photoFace' | 'photoLeft' | 'photoRight', event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  uploadingAngle.value = angle
+  try {
+    await save({ [angle]: file })
+  } finally {
+    uploadingAngle.value = null
+  }
+}
+
+const saving = ref(false)
+
+async function submit() {
+  saving.value = true
+  try {
+    await save({ mood: mood.value as 'better' | 'same' | 'worse', symptoms: selectedSymptoms.value, note: note.value })
+    router.push('/app')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function skipToday() {
+  saving.value = true
+  try {
+    await save({ skipped: true })
+    router.push('/app')
+  } finally {
+    saving.value = false
+  }
+}
 </script>
 
 <template>
@@ -35,21 +68,42 @@ const eveningChecklist = [
       <div class="flex items-center gap-3 px-[22px] pt-3">
         <button type="button" class="grid h-[38px] w-[38px] flex-none place-items-center rounded-full border border-ink/16" @click="router.push('/app')">✕</button>
         <div class="flex-1">
-          <div class="font-heading text-lg font-normal">Mercredi 12 mars</div>
-          <div class="text-[11.5px] font-semibold text-ink/50">Jour 24 · semaine 4</div>
+          <div class="font-heading text-lg font-normal">Entrée du jour</div>
         </div>
-        <BaseButton variant="ghost" @click="router.push('/app')">Ignorer</BaseButton>
+        <BaseButton variant="ghost" :disabled="saving" @click="skipToday">Ignorer</BaseButton>
       </div>
 
       <div class="flex gap-2.5 px-[22px] pt-4">
-        <div class="flex h-[180px] flex-1 items-end justify-start rounded-lg p-2.5 text-[10px] font-semibold text-ink/55" style="background: linear-gradient(140deg, #e0d5c4, #c9bda8)">
+        <div
+          class="flex h-[180px] flex-1 items-end justify-start rounded-lg bg-cover bg-center p-2.5 text-[10px] font-semibold text-ink/55"
+          :style="entry?.photos.face ? { backgroundImage: `url(${entry.photos.face})` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
+        >
           Face · aujourd'hui
         </div>
         <div class="flex w-[92px] flex-col gap-2.5">
-          <div class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 text-center text-[10px] font-semibold text-ink/45">+ Profil G</div>
-          <div class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 text-center text-[10px] font-semibold text-ink/45">+ Profil D</div>
+          <button
+            type="button"
+            class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 bg-cover bg-center text-center text-[10px] font-semibold text-ink/45"
+            :style="entry?.photos.left ? { backgroundImage: `url(${entry.photos.left})` } : ''"
+            :disabled="uploadingAngle === 'photoLeft'"
+            @click="leftInput?.click()"
+          >
+            {{ entry?.photos.left ? '' : '+ Profil G' }}
+          </button>
+          <button
+            type="button"
+            class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 bg-cover bg-center text-center text-[10px] font-semibold text-ink/45"
+            :style="entry?.photos.right ? { backgroundImage: `url(${entry.photos.right})` } : ''"
+            :disabled="uploadingAngle === 'photoRight'"
+            @click="rightInput?.click()"
+          >
+            {{ entry?.photos.right ? '' : '+ Profil D' }}
+          </button>
         </div>
       </div>
+      <input ref="faceInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoFace', $event)">
+      <input ref="leftInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoLeft', $event)">
+      <input ref="rightInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoRight', $event)">
 
       <div class="flex-1 overflow-auto px-[22px] pt-5 pb-6">
         <EyebrowLabel>Aujourd'hui, ma peau est…</EyebrowLabel>
@@ -57,7 +111,15 @@ const eveningChecklist = [
 
         <EyebrowLabel class="mt-5">Ce que je ressens</EyebrowLabel>
         <div class="mt-2.5 flex flex-wrap gap-1.5">
-          <TagBadge v-for="tag in feelingTags" :key="tag.label" :variant="tag.variant">{{ tag.label }}</TagBadge>
+          <TagBadge
+            v-for="label in feelingLabels"
+            :key="label"
+            :variant="selectedSymptoms.includes(label) ? 'accent' : 'neutral'"
+            class="cursor-pointer"
+            @click="toggleSymptom(label)"
+          >
+            {{ label }}
+          </TagBadge>
         </div>
 
         <div class="mt-5">
@@ -69,7 +131,9 @@ const eveningChecklist = [
           Sauter un soir n'annule rien. Reprenez au prochain jour prévu, sans doubler la dose.
         </InfoNote>
 
-        <BaseButton variant="primary" block class="mt-3.5" @click="router.push('/app')">Enregistrer la journée</BaseButton>
+        <BaseButton variant="primary" block class="mt-3.5" :disabled="saving" @click="submit">
+          {{ saving ? 'Enregistrement…' : 'Enregistrer la journée' }}
+        </BaseButton>
       </div>
     </div>
 
@@ -80,39 +144,60 @@ const eveningChecklist = [
           <BrandMark :size="30" />
           Skincare Planning
         </NuxtLink>
-        <span class="text-sm font-semibold text-ink/50">Mercredi 12 mars · Jour 24</span>
+        <span class="text-sm font-semibold text-ink/50">Entrée du jour</span>
         <div class="ml-auto flex items-center gap-3">
-          <BaseButton variant="ghost" @click="router.push('/app')">Ignorer aujourd'hui</BaseButton>
-          <BaseButton variant="primary" @click="router.push('/app')">Enregistrer la journée</BaseButton>
+          <BaseButton variant="ghost" :disabled="saving" @click="skipToday">Ignorer aujourd'hui</BaseButton>
+          <BaseButton variant="primary" :disabled="saving" @click="submit">
+            {{ saving ? 'Enregistrement…' : 'Enregistrer la journée' }}
+          </BaseButton>
         </div>
       </div>
 
       <div class="grid flex-1 grid-cols-[1.25fr_1fr]">
         <div class="flex min-h-0 flex-col border-r border-ink/16 p-7">
           <div class="flex items-baseline justify-between">
-            <EyebrowLabel>Photos du jour · 1 sur 3</EyebrowLabel>
-            <span class="text-sm text-ink/50">Glissez-déposez ou webcam</span>
+            <EyebrowLabel>Photos du jour · {{ [entry?.photos.face, entry?.photos.left, entry?.photos.right].filter(Boolean).length }} sur 3</EyebrowLabel>
+            <span class="text-sm text-ink/50">Cliquez pour importer</span>
           </div>
 
           <div class="mt-3.5 grid min-h-0 flex-1 grid-cols-[2fr_1fr] gap-3.5">
-            <div class="flex items-end justify-end rounded-lg p-2.5" style="background: linear-gradient(140deg, #e0d5c4, #c9bda8)">
-              <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[10px] font-semibold text-ink/55">Face · J24</span>
-            </div>
+            <button
+              type="button"
+              class="flex items-end justify-end rounded-lg bg-cover bg-center p-2.5"
+              :style="entry?.photos.face ? { backgroundImage: `url(${entry.photos.face})` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
+              @click="faceInput?.click()"
+            >
+              <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[10px] font-semibold text-ink/55">Face</span>
+            </button>
             <div class="flex min-h-0 flex-col gap-3.5">
-              <div class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 text-ink/50">
-                <span class="font-heading text-[22px] font-normal text-accent">+</span>
-                <span class="text-[11px] font-semibold">Profil gauche</span>
-              </div>
-              <div class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 text-ink/50">
-                <span class="font-heading text-[22px] font-normal text-accent">+</span>
-                <span class="text-[11px] font-semibold">Profil droit</span>
-              </div>
+              <button
+                type="button"
+                class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 bg-cover bg-center text-ink/50"
+                :style="entry?.photos.left ? { backgroundImage: `url(${entry.photos.left})` } : ''"
+                @click="leftInput?.click()"
+              >
+                <template v-if="!entry?.photos.left">
+                  <span class="font-heading text-[22px] font-normal text-accent">+</span>
+                  <span class="text-[11px] font-semibold">Profil gauche</span>
+                </template>
+              </button>
+              <button
+                type="button"
+                class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 bg-cover bg-center text-ink/50"
+                :style="entry?.photos.right ? { backgroundImage: `url(${entry.photos.right})` } : ''"
+                @click="rightInput?.click()"
+              >
+                <template v-if="!entry?.photos.right">
+                  <span class="font-heading text-[22px] font-normal text-accent">+</span>
+                  <span class="text-[11px] font-semibold">Profil droit</span>
+                </template>
+              </button>
             </div>
           </div>
 
           <InfoNote tone="accent" class="mt-4">
-            <strong>Même lumière, même distance.</strong> Le calque de votre photo d'hier s'affiche en transparence
-            pour vous aligner — c'est ce qui rend la comparaison honnête.
+            <strong>Même lumière, même distance.</strong> Photographiez-vous dans les mêmes conditions que la veille
+            — c'est ce qui rend la comparaison honnête.
           </InfoNote>
         </div>
 
@@ -122,12 +207,20 @@ const eveningChecklist = [
 
           <EyebrowLabel class="mt-6">Ce que je ressens</EyebrowLabel>
           <div class="mt-3 flex flex-wrap gap-2">
-            <TagBadge v-for="tag in feelingTags" :key="tag.label" :variant="tag.variant">{{ tag.label }}</TagBadge>
+            <TagBadge
+              v-for="label in feelingLabels"
+              :key="label"
+              :variant="selectedSymptoms.includes(label) ? 'accent' : 'neutral'"
+              class="cursor-pointer"
+              @click="toggleSymptom(label)"
+            >
+              {{ label }}
+            </TagBadge>
           </div>
 
           <EyebrowLabel class="mt-6">Traitement suivi ce soir</EyebrowLabel>
           <div class="mt-3 flex flex-col gap-2.5">
-            <ChecklistItem v-for="item in eveningChecklist" :key="item.label" v-bind="item" />
+            <ChecklistItem v-for="item in entry?.tasks ?? []" :key="item.id" :label="item.label" :done="item.done" />
           </div>
 
           <div class="mt-6">

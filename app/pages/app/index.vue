@@ -1,6 +1,14 @@
 <script setup lang="ts">
-const today = useToday()
+const { today, toggleTask } = await useToday()
 const router = useRouter()
+
+async function onToggleTask(id: number) {
+  try {
+    await toggleTask(id)
+  } catch {
+    // Photo/note tasks are derived automatically and can't be toggled directly.
+  }
+}
 </script>
 
 <template>
@@ -15,7 +23,7 @@ const router = useRouter()
         <NuxtLink to="/app/profile" class="h-[38px] w-[38px] flex-none rounded-full bg-neutral-300" />
       </div>
 
-      <div class="px-[22px] pt-5">ç
+      <div class="px-[22px] pt-5">
         <div class="text-[11.5px] font-semibold text-ink/50">{{ today.dateLabel }} · Jour {{ today.dayNumber }}</div>
         <h2 class="mt-1 font-heading text-[32px] font-normal">Bonjour {{ today.userName }}</h2>
       </div>
@@ -26,7 +34,7 @@ const router = useRouter()
 
       <div class="flex-1 px-[22px] pt-[22px] pb-6">
         <EyebrowLabel>À faire aujourd'hui</EyebrowLabel>
-        <DailyChecklist :items="today.tasks" />
+        <DailyChecklist :items="today.tasks" @toggle="onToggleTask" />
 
         <InfoNote class="mt-3.5">
           <strong>{{ today.weeklyNote.title }}</strong> {{ today.weeklyNote.body }}
@@ -58,7 +66,7 @@ const router = useRouter()
 
           <div class="flex min-h-0 flex-col">
             <EyebrowLabel>À faire aujourd'hui</EyebrowLabel>
-            <DailyChecklist :items="today.desktopTasks" />
+            <DailyChecklist :items="today.desktopTasks" @toggle="onToggleTask" />
 
             <EyebrowLabel class="mt-6">Prochain jalon</EyebrowLabel>
             <MilestoneCard

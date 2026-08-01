@@ -2,8 +2,8 @@
 definePageMeta({ layout: 'blank' })
 
 const router = useRouter()
-const today = useToday()
 const { login } = useAuth()
+const highlights = await useAdviceList()
 
 const email = ref('lea.martin@email.fr')
 const password = ref('')
@@ -23,12 +23,6 @@ async function submit() {
     loading.value = false
   }
 }
-
-const highlights = [
-  { title: 'Gérer la desquamation', meta: '4 études citées · relu en juillet' },
-  { title: 'Choisir un SPF non comédogène', meta: '6 études citées · relu en juin' },
-  { title: 'Marques post-acné', meta: '5 études citées · relu en juin' },
-]
 </script>
 
 <template>
@@ -41,7 +35,7 @@ const highlights = [
 
       <div class="mx-auto my-auto w-full max-w-[400px] py-10">
         <h1 class="font-heading text-[36px] font-normal sm:text-[46px]">Bon retour</h1>
-        <p class="mt-2 text-sm text-ink/50">Votre série vous attend — {{ today.streak }} jours d'affilée.</p>
+        <p class="mt-2 text-sm text-ink/50">Vos fiches conseil sourcées vous attendent.</p>
 
         <form class="mt-7 flex flex-col gap-3.5" @submit.prevent="submit">
           <div>
@@ -76,8 +70,8 @@ const highlights = [
         </div>
 
         <div class="flex gap-3">
-          <BaseButton variant="secondary" class="flex-1 justify-center py-3">Continuer avec Apple</BaseButton>
-          <BaseButton variant="secondary" class="flex-1 justify-center py-3">Continuer avec Google</BaseButton>
+          <BaseButton variant="secondary" class="flex-1 justify-center py-3" disabled title="Bientôt disponible">Continuer avec Apple</BaseButton>
+          <BaseButton variant="secondary" class="flex-1 justify-center py-3" disabled title="Bientôt disponible">Continuer avec Google</BaseButton>
         </div>
 
         <p class="mt-6 text-[13.5px]">
@@ -98,9 +92,9 @@ const highlights = [
           Trois nouvelles fiches relues pour votre profil.
         </div>
         <div class="mt-7 flex flex-col gap-3">
-          <div v-for="h in highlights" :key="h.title" class="rounded-lg bg-bg/10 px-4 py-4">
+          <div v-for="h in highlights.slice(0, 3)" :key="h.slug" class="rounded-lg bg-bg/10 px-4 py-4">
             <div class="font-heading text-[22px] font-normal">{{ h.title }}</div>
-            <div class="mt-0.5 text-[12.5px] opacity-75">{{ h.meta }}</div>
+            <div v-if="h.meta" class="mt-0.5 text-[12.5px] opacity-75">{{ h.meta }}</div>
           </div>
         </div>
       </div>

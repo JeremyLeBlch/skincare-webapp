@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const treatment = useTreatment()
+import type { NewProduct } from '~/composables/useTreatment'
+
+const { treatment, addProduct, removeProduct, alternateProduct, dismissWarning } = await useTreatment()
 
 const viewOptions = [
   { label: 'Par moment', value: 'moment' },
@@ -7,10 +9,27 @@ const viewOptions = [
   { label: 'Ingrédients', value: 'ingredients' },
 ]
 const view = ref('moment')
+
+function onAdd(period: 'morning' | 'evening', payload: { name: string; meta: string; frequency: string; highlight: boolean }) {
+  const product: NewProduct = {
+    period,
+    name: payload.name,
+    meta: payload.meta || undefined,
+    tag_label: payload.frequency,
+    tag_variant: payload.highlight ? 'accent-2' : 'neutral',
+    highlight: payload.highlight,
+  }
+  addProduct(product)
+}
+
+function onAlternate() {
+  const id = treatment.value?.interactionWarning?.itemId
+  if (id) alternateProduct(id)
+}
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col lg:min-h-0">
+  <div v-if="treatment" class="flex flex-1 flex-col lg:min-h-0">
     <!-- Mobile (< lg) -->
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="flex items-baseline justify-between px-[22px] pt-3.5">
@@ -21,19 +40,22 @@ const view = ref('moment')
       <div class="flex-1 overflow-auto px-[22px] pt-4 pb-6">
         <EyebrowLabel>Matin · {{ treatment.morning.length }} étapes</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-2.5">
-          <ProductRow v-for="p in treatment.morning" :key="p.name" v-bind="p" />
+          <ProductRow v-for="p in treatment.morning" :key="p.id" v-bind="p" removable @remove="removeProduct(p.id)" />
         </div>
 
         <EyebrowLabel class="mt-[22px]">Soir · {{ treatment.evening.length }} étapes</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-2.5">
-          <ProductRow v-for="p in treatment.evening" :key="p.name" v-bind="p" />
+          <ProductRow v-for="p in treatment.evening" :key="p.id" v-bind="p" removable @remove="removeProduct(p.id)" />
         </div>
 
-        <AddProductCard title="Ajouter un produit" subtitle="Scan du code-barres ou recherche INCI" />
+        <AddProductCard title="Ajouter un produit" subtitle="Nom et fréquence" @add="onAdd('evening', $event)" />
 
-        <InfoNote tone="accent-2" class="mt-3.5">
+        <InfoNote v-if="treatment.interactionWarning" tone="accent-2" class="mt-3.5">
           <strong>{{ treatment.interactionWarning.title }}</strong> {{ treatment.interactionWarning.body }}
-          <NuxtLink to="/app/advice" class="mt-1.5 block font-semibold text-accent-2">Voir pourquoi →</NuxtLink>
+          <div class="mt-2.5 flex gap-2.5">
+            <BaseButton variant="primary" class="text-[13px]" @click="onAlternate">Alterner</BaseButton>
+            <BaseButton variant="secondary" class="text-[13px]" @click="dismissWarning">Ignorer</BaseButton>
+          </div>
         </InfoNote>
       </div>
     </div>
@@ -47,7 +69,6 @@ const view = ref('moment')
         </div>
         <div class="flex items-center gap-3">
           <SegmentedControl v-model="view" name="treatment-view" :options="viewOptions" />
-          <BaseButton variant="primary">Ajouter un produit</BaseButton>
         </div>
       </div>
 
@@ -55,30 +76,33 @@ const view = ref('moment')
         <div class="flex flex-col overflow-auto">
           <EyebrowLabel>Matin · {{ treatment.morning.length }} étapes</EyebrowLabel>
           <div class="mt-3.5 flex flex-col gap-3">
-            <ProductRow v-for="p in treatment.morning" :key="p.name" v-bind="p" />
+            <ProductRow v-for="p in treatment.morning" :key="p.id" v-bind="p" removable @remove="removeProduct(p.id)" />
           </div>
-          <AddProductCard title="Ajouter au matin" subtitle="Recherche INCI ou code-barres" />
+          <AddProductCard title="Ajouter au matin" subtitle="Nom et fréquence" @add="onAdd('morning', $event)" />
         </div>
 
         <div class="flex flex-col overflow-auto">
           <EyebrowLabel>Soir · {{ treatment.evening.length }} étapes</EyebrowLabel>
           <div class="mt-3.5 flex flex-col gap-3">
-            <ProductRow v-for="p in treatment.evening" :key="p.name" v-bind="p" />
+            <ProductRow v-for="p in treatment.evening" :key="p.id" v-bind="p" removable @remove="removeProduct(p.id)" />
           </div>
-          <AddProductCard title="Ajouter au soir" subtitle="Recherche INCI ou code-barres" />
+          <AddProductCard title="Ajouter au soir" subtitle="Nom et fréquence" @add="onAdd('evening', $event)" />
         </div>
 
         <div class="flex flex-col gap-3.5 overflow-auto">
           <EyebrowLabel>Vérifications</EyebrowLabel>
-          <InfoNote tone="accent-2">
+          <InfoNote v-if="treatment.interactionWarning" tone="accent-2">
             <strong>{{ treatment.interactionWarning.title }}</strong> {{ treatment.interactionWarning.body }}
             <div class="mt-3 flex gap-2.5">
-              <BaseButton variant="primary" class="text-[13px]">Alterner</BaseButton>
-              <BaseButton variant="secondary" class="text-[13px]">Ignorer</BaseButton>
+              <BaseButton variant="primary" class="text-[13px]" @click="onAlternate">Alterner</BaseButton>
+              <BaseButton variant="secondary" class="text-[13px]" @click="dismissWarning">Ignorer</BaseButton>
             </div>
           </InfoNote>
-          <InfoNote>
+          <InfoNote v-if="treatment.photoprotectionNote">
             <strong>Photoprotection.</strong> {{ treatment.photoprotectionNote }}
+          </InfoNote>
+          <InfoNote v-if="treatment.guide">
+            <strong>{{ treatment.guide.title }}.</strong> {{ treatment.guide.advice }}
           </InfoNote>
 
           <EyebrowLabel muted class="mt-1.5">Rythme de la semaine</EyebrowLabel>

@@ -69,8 +69,8 @@ const steps = [
         <p class="mt-2 text-sm text-ink/50">Deux minutes, puis on parle de votre peau. Gratuit, sans abonnement.</p>
 
         <div class="mt-6 flex gap-3">
-          <BaseButton variant="secondary" class="flex-1 justify-center py-3">Continuer avec Apple</BaseButton>
-          <BaseButton variant="secondary" class="flex-1 justify-center py-3">Continuer avec Google</BaseButton>
+          <BaseButton variant="secondary" class="flex-1 justify-center py-3" disabled title="Bientôt disponible">Continuer avec Apple</BaseButton>
+          <BaseButton variant="secondary" class="flex-1 justify-center py-3" disabled title="Bientôt disponible">Continuer avec Google</BaseButton>
         </div>
 
         <div class="my-5.5 flex items-center gap-3.5">

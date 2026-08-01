@@ -1,10 +1,13 @@
 <script setup lang="ts">
 defineProps<{
   name: string
-  meta: string
+  meta: string | null
   tag: { label: string; variant: 'accent' | 'accent-2' | 'neutral' | 'outline' }
   highlight?: boolean
+  removable?: boolean
 }>()
+
+defineEmits<{ remove: [] }>()
 </script>
 
 <template>
@@ -15,8 +18,17 @@ defineProps<{
     />
     <div class="flex-1">
       <div class="text-sm font-semibold">{{ name }}</div>
-      <div class="text-[11.5px] text-ink/50">{{ meta }}</div>
+      <div v-if="meta" class="text-[11.5px] text-ink/50">{{ meta }}</div>
     </div>
     <TagBadge :variant="tag.variant">{{ tag.label }}</TagBadge>
+    <button
+      v-if="removable"
+      type="button"
+      class="grid h-6 w-6 flex-none place-items-center rounded-full text-ink/40 hover:bg-ink/10 hover:text-ink"
+      aria-label="Retirer ce produit"
+      @click="$emit('remove')"
+    >
+      ×
+    </button>
   </div>
 </template>

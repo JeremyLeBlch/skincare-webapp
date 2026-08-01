@@ -2,9 +2,31 @@
 definePageMeta({ layout: 'blank' })
 
 const router = useRouter()
+const { save } = await useEntry()
 
 const angles = ['Face', 'Profil G', 'Profil D']
 const angle = ref('Face')
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+
+const angleKey = computed(() => ({ Face: 'photoFace', 'Profil G': 'photoLeft', 'Profil D': 'photoRight' })[angle.value] as 'photoFace' | 'photoLeft' | 'photoRight')
+
+function openCamera() {
+  fileInput.value?.click()
+}
+
+async function onFileSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  uploading.value = true
+  try {
+    await save({ [angleKey.value]: file })
+    router.push('/app/entry')
+  } finally {
+    uploading.value = false
+  }
+}
 </script>
 
 <template>
@@ -32,12 +54,15 @@ const angle = ref('Face')
           <div class="h-[52px] w-[52px] flex-none rounded-[18px]" style="background: rgba(247, 242, 233, 0.2)" />
           <button
             type="button"
-            class="grid h-[78px] w-[78px] cursor-pointer place-items-center rounded-full border-[3px]"
+            class="grid h-[78px] w-[78px] cursor-pointer place-items-center rounded-full border-[3px] disabled:opacity-50"
             style="border-color: #f7f2e9"
-            @click="router.push('/app/entry')"
+            :disabled="uploading"
+            @click="openCamera"
           >
             <span class="h-[62px] w-[62px] rounded-full" style="background: #f7f2e9" />
           </button>
+          <input ref="fileInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onFileSelected">
+          <span v-if="uploading" class="absolute bottom-[110px] left-1/2 -translate-x-1/2 text-[11px] font-semibold">Envoi…</span>
           <div class="flex w-[52px] flex-col items-center gap-1 text-[10px] font-semibold">
             <span class="text-lg">◐</span>
             Fantôme

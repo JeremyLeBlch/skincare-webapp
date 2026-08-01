@@ -1,7 +1,17 @@
 <script setup lang="ts">
-const { filters, ingredients } = useIngredients()
+const { filters, ingredients, search, activeCategory } = await useIngredients()
 
-const selected = ref(ingredients[0])
+const selected = ref(ingredients.value[0] ?? null)
+
+watch(ingredients, (list) => {
+  if (!list.some((i) => i.slug === selected.value?.slug)) {
+    selected.value = list[0] ?? null
+  }
+})
+
+function toggleFilter(key: string) {
+  activeCategory.value = activeCategory.value === key ? null : key
+}
 </script>
 
 <template>
@@ -10,18 +20,26 @@ const selected = ref(ingredients[0])
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="px-[22px] pt-3.5">
         <h3 class="mb-3 font-heading text-[25px] font-normal">Ingrédients</h3>
-        <input class="w-full rounded-md bg-surface px-3.5 py-2.5 text-sm" placeholder="Niacinamide, acide azélaïque…">
+        <input v-model="search" class="w-full rounded-md bg-surface px-3.5 py-2.5 text-sm" placeholder="Niacinamide, acide azélaïque…">
       </div>
 
       <div class="flex flex-wrap gap-1.5 px-[22px] pt-3.5">
-        <TagBadge v-for="(f, i) in filters" :key="f" :variant="i === 0 ? 'accent' : 'neutral'">{{ f }}</TagBadge>
+        <TagBadge
+          v-for="f in filters"
+          :key="f.key"
+          :variant="activeCategory === f.key ? 'accent' : 'neutral'"
+          class="cursor-pointer"
+          @click="toggleFilter(f.key)"
+        >
+          {{ f.label }}
+        </TagBadge>
       </div>
 
       <div class="flex-1 overflow-auto px-[22px] pt-4 pb-6">
         <div class="flex flex-col gap-3">
           <div
             v-for="ing in ingredients"
-            :key="ing.name"
+            :key="ing.slug"
             class="rounded-lg bg-surface p-4"
             :class="ing.dimmed ? 'opacity-75' : ''"
           >
@@ -33,6 +51,7 @@ const selected = ref(ingredients[0])
             <p class="mt-1.5 text-[12.5px] leading-relaxed">{{ ing.body }}</p>
             <div v-if="ing.meta" class="mt-2 text-[10.5px] text-ink/45">{{ ing.meta }}</div>
           </div>
+          <InfoNote v-if="!ingredients.length">Aucun ingrédient ne correspond à cette recherche.</InfoNote>
         </div>
       </div>
     </div>
@@ -41,37 +60,47 @@ const selected = ref(ingredients[0])
     <div class="hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
       <div class="grid min-h-0 flex-1 grid-cols-[1fr_1.4fr]">
         <div class="flex min-h-0 flex-col border-r border-ink/16 p-6">
+          <input v-model="search" class="mb-3 w-full rounded-md bg-surface px-3.5 py-2.5 text-sm" placeholder="Niacinamide, acide azélaïque…">
           <div class="flex flex-wrap gap-2">
-            <TagBadge v-for="(f, i) in filters" :key="f" :variant="i === 0 ? 'accent' : 'neutral'">{{ f }}</TagBadge>
+            <TagBadge
+              v-for="f in filters"
+              :key="f.key"
+              :variant="activeCategory === f.key ? 'accent' : 'neutral'"
+              class="cursor-pointer"
+              @click="toggleFilter(f.key)"
+            >
+              {{ f.label }}
+            </TagBadge>
           </div>
 
           <div class="mt-4 flex flex-1 flex-col gap-2.5 overflow-auto">
             <button
               v-for="ing in ingredients"
-              :key="ing.name"
+              :key="ing.slug"
               type="button"
               class="rounded-lg p-4 text-left"
               :class="[
-                selected.name === ing.name ? 'bg-accent text-bg' : 'bg-surface',
-                ing.dimmed && selected.name !== ing.name ? 'opacity-75' : '',
+                selected?.slug === ing.slug ? 'bg-accent text-bg' : 'bg-surface',
+                ing.dimmed && selected?.slug !== ing.slug ? 'opacity-75' : '',
               ]"
               @click="selected = ing"
             >
               <div class="flex items-baseline justify-between">
                 <div class="font-heading text-[22px] font-normal">{{ ing.name }}</div>
-                <TagBadge v-if="selected.name !== ing.name" :variant="ing.tag.variant">{{ ing.tag.label }}</TagBadge>
+                <TagBadge v-if="selected?.slug !== ing.slug" :variant="ing.tag.variant">{{ ing.tag.label }}</TagBadge>
                 <span v-else class="rounded-full px-3 py-[5px] text-[11px] tracking-wide" style="background: rgba(247, 242, 233, 0.2)">
                   {{ ing.tag.label }}
                 </span>
               </div>
-              <div class="mt-0.5 text-xs" :class="selected.name === ing.name ? 'opacity-80' : 'text-ink/50'">
+              <div class="mt-0.5 text-xs" :class="selected?.slug === ing.slug ? 'opacity-80' : 'text-ink/50'">
                 {{ ing.subtitle }}
               </div>
             </button>
+            <InfoNote v-if="!ingredients.length">Aucun ingrédient ne correspond à cette recherche.</InfoNote>
           </div>
         </div>
 
-        <div class="overflow-auto px-9 py-7">
+        <div v-if="selected" class="overflow-auto px-9 py-7">
           <EyebrowLabel>{{ selected.detail?.eyebrow ?? selected.subtitle }}</EyebrowLabel>
           <h2 class="mt-2.5 font-heading text-[32px] font-normal">{{ selected.name }}</h2>
           <div class="text-[11.5px] text-ink/50">{{ selected.subtitle }}</div>

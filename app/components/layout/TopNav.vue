@@ -26,6 +26,14 @@ const route = useRoute()
       >
         {{ item.label }}
       </NuxtLink>
+      <NuxtLink
+        to="/app/account"
+        class="flex items-center gap-2.5 rounded-full py-[5px] pr-3.5 pl-[5px] text-[13px] font-semibold no-underline"
+        :class="route.path === '/app/account' ? 'bg-accent text-bg' : 'bg-surface text-ink'"
+      >
+        <span class="h-8 w-8 flex-none rounded-full" style="background: linear-gradient(140deg, #e0d5c4, #c9bda8)" />
+        Mon profil
+      </NuxtLink>
     </div>
   </nav>
 </template>

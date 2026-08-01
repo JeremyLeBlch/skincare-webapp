@@ -2,55 +2,137 @@
 definePageMeta({ layout: 'blank' })
 
 const router = useRouter()
+const { questions, submit } = await useDiagnostic()
 
-const options = [
-  { value: 'oily', label: 'Brillante et grasse', subLabel: 'Oily / shiny' },
-  { value: 'combination', label: 'Grasse au centre, sèche ailleurs', subLabel: 'Combination' },
-  { value: 'normal', label: 'Confortable, sans excès', subLabel: 'Normal' },
-  { value: 'dry', label: 'Tiraille, desquame', subLabel: 'Dry / flaking' },
-]
-const skinType = ref('combination')
+const currentIndex = ref(0)
+const currentQuestion = computed(() => questions.value[currentIndex.value])
+const total = computed(() => questions.value.length)
+const submitting = ref(false)
 
-const progressSteps = [
-  { label: 'Objectif du suivi', state: 'done', meta: 'Acné légère' },
-  { label: 'Sensibilité de la peau', state: 'done', meta: 'Moyenne' },
-  { label: 'Sébum en fin de journée', state: 'current' },
-  { label: 'Réactions passées', state: 'pending' },
-  { label: 'Traitement prescrit ?', state: 'pending' },
-  { label: 'Première photo', state: 'pending' },
-]
+// question_id -> answer draft, prefilled from any existing answers.
+const drafts = reactive<Record<number, { optionIds: number[]; value: string }>>({})
+
+watchEffect(() => {
+  for (const q of questions.value) {
+    if (!(q.id in drafts)) {
+      drafts[q.id] = { optionIds: [...(q.answer?.option_ids ?? [])], value: q.answer?.value ?? '' }
+    }
+  }
+})
+
+const draft = computed(() => currentQuestion.value ? drafts[currentQuestion.value.id] : null)
+
+function isSelected(optionId: number) {
+  return draft.value?.optionIds.includes(optionId) ?? false
+}
+
+function selectSingle(optionId: number) {
+  if (draft.value) draft.value.optionIds = [optionId]
+}
+
+function toggleMultiple(optionId: number) {
+  if (!draft.value) return
+  const idx = draft.value.optionIds.indexOf(optionId)
+  if (idx === -1) draft.value.optionIds.push(optionId)
+  else draft.value.optionIds.splice(idx, 1)
+}
+
+const canContinue = computed(() => {
+  if (!currentQuestion.value || !draft.value) return false
+  if (currentQuestion.value.type === 'text' || currentQuestion.value.type === 'number') return true
+  return draft.value.optionIds.length > 0
+})
+
+async function goNext() {
+  if (currentIndex.value < total.value - 1) {
+    currentIndex.value++
+    return
+  }
+  await finish()
+}
+
+function goBack() {
+  if (currentIndex.value > 0) currentIndex.value--
+  else router.push('/app/account')
+}
+
+async function finish() {
+  submitting.value = true
+  try {
+    const answers = questions.value.map((q) => ({
+      question_id: q.id,
+      option_ids: drafts[q.id]?.optionIds ?? [],
+      value: drafts[q.id]?.value || null,
+    }))
+    await submit(answers)
+    router.push('/app')
+  } finally {
+    submitting.value = false
+  }
+}
+
+function stepState(index: number): 'done' | 'current' | 'pending' {
+  if (index < currentIndex.value) return 'done'
+  if (index === currentIndex.value) return 'current'
+  return 'pending'
+}
+
+function stepMeta(question: (typeof questions.value)[number]) {
+  const d = drafts[question.id]
+  if (!d) return undefined
+  const labels = question.options.filter((o) => d.optionIds.includes(o.id)).map((o) => o.label)
+  return labels.length ? labels.join(', ') : (d.value || undefined)
+}
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col">
+  <div v-if="currentQuestion" class="flex flex-1 flex-col">
     <!-- Mobile (< lg) -->
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="flex items-center gap-3 px-[22px] pt-3">
-        <NuxtLink to="/app" class="grid h-[38px] w-[38px] flex-none place-items-center rounded-full border border-ink/16">←</NuxtLink>
+        <button type="button" class="grid h-[38px] w-[38px] flex-none place-items-center rounded-full border border-ink/16" @click="goBack">←</button>
         <div class="h-1.5 flex-1 rounded-full bg-neutral-300">
-          <div class="h-full w-1/2 rounded-full bg-accent" />
+          <div class="h-full rounded-full bg-accent" :style="{ width: `${((currentIndex + 1) / total) * 100}%` }" />
         </div>
-        <span class="text-xs font-semibold">3/6</span>
+        <span class="text-xs font-semibold">{{ currentIndex + 1 }}/{{ total }}</span>
       </div>
 
       <div class="px-[22px] pt-[26px]">
         <EyebrowLabel>Votre peau</EyebrowLabel>
         <h2 class="mt-2.5 text-pretty font-heading text-[30px] font-normal leading-[1.15]">
-          En fin de journée, votre zone T est…
+          {{ currentQuestion.label }}
         </h2>
-        <div class="text-[11.5px] text-ink/50">How does your T-zone feel by evening?</div>
 
-        <div class="mt-5 flex flex-col gap-2.5">
+        <div v-if="currentQuestion.type === 'single_choice'" class="mt-5 flex flex-col gap-2.5">
           <RadioOption
-            v-for="opt in options"
-            :key="opt.value"
-            v-model="skinType"
-            :value="opt.value"
+            v-for="opt in currentQuestion.options"
+            :key="opt.id"
+            :model-value="isSelected(opt.id) ? 'sel' : ''"
+            value="sel"
             :label="opt.label"
-            :sub-label="opt.subLabel"
-            name="skin-type-mobile"
+            name="diag-mobile"
+            @update:model-value="selectSingle(opt.id)"
           />
         </div>
+
+        <div v-else-if="currentQuestion.type === 'multiple_choice'" class="mt-5 flex flex-wrap gap-2">
+          <TagBadge
+            v-for="opt in currentQuestion.options"
+            :key="opt.id"
+            :variant="isSelected(opt.id) ? 'accent' : 'neutral'"
+            class="cursor-pointer"
+            @click="toggleMultiple(opt.id)"
+          >
+            {{ opt.label }}
+          </TagBadge>
+        </div>
+
+        <textarea
+          v-else
+          v-model="draft!.value"
+          class="mt-5 min-h-[100px] w-full rounded-md bg-surface p-3.5 text-sm"
+          placeholder="Facultatif — laissez vide si non concerné"
+        />
 
         <InfoNote tone="accent" class="mt-[18px]">
           Pas d'inquiétude si vous hésitez — on affinera avec vos photos des premières semaines.
@@ -58,7 +140,9 @@ const progressSteps = [
       </div>
 
       <div class="mt-auto px-[22px] pb-[26px] pt-4">
-        <BaseButton variant="primary" block @click="router.push('/app')">Continuer</BaseButton>
+        <BaseButton variant="primary" block :disabled="!canContinue || submitting" @click="goNext">
+          {{ submitting ? 'Enregistrement…' : (currentIndex === total - 1 ? 'Terminer' : 'Continuer') }}
+        </BaseButton>
       </div>
     </div>
 
@@ -69,62 +153,81 @@ const progressSteps = [
           <BrandMark :size="30" />
           Skincare Planning
         </NuxtLink>
-        <span class="text-sm font-semibold text-ink/50">Étape 3 sur 6</span>
+        <span class="text-sm font-semibold text-ink/50">Étape {{ currentIndex + 1 }} sur {{ total }}</span>
         <BaseButton variant="ghost" class="ml-auto" @click="router.push('/app')">Reprendre plus tard</BaseButton>
       </div>
 
       <div class="h-1.5 bg-neutral-200">
-        <div class="h-full w-1/2 rounded-r-full bg-accent" />
+        <div class="h-full rounded-r-full bg-accent" :style="{ width: `${((currentIndex + 1) / total) * 100}%` }" />
       </div>
 
       <div class="grid flex-1 grid-cols-2">
         <div class="flex flex-col px-11 py-[52px]">
           <EyebrowLabel>Votre peau</EyebrowLabel>
-          <h1 class="mt-3 max-w-[16ch] text-pretty font-heading text-[48px] font-normal leading-[1.1]">
-            En fin de journée, votre zone T est…
+          <h1 class="mt-3 max-w-[20ch] text-pretty font-heading text-[48px] font-normal leading-[1.1]">
+            {{ currentQuestion.label }}
           </h1>
-          <div class="text-[11.5px] text-ink/50">How does your T-zone feel by evening?</div>
 
-          <div class="mt-[26px] flex flex-col gap-3">
+          <div v-if="currentQuestion.type === 'single_choice'" class="mt-[26px] flex flex-col gap-3">
             <RadioOption
-              v-for="opt in options"
-              :key="opt.value"
-              v-model="skinType"
-              :value="opt.value"
+              v-for="opt in currentQuestion.options"
+              :key="opt.id"
+              :model-value="isSelected(opt.id) ? 'sel' : ''"
+              value="sel"
               :label="opt.label"
-              :sub-label="opt.subLabel"
-              name="skin-type-desktop"
+              name="diag-desktop"
+              @update:model-value="selectSingle(opt.id)"
             />
           </div>
 
+          <div v-else-if="currentQuestion.type === 'multiple_choice'" class="mt-[26px] flex flex-wrap gap-2.5">
+            <TagBadge
+              v-for="opt in currentQuestion.options"
+              :key="opt.id"
+              :variant="isSelected(opt.id) ? 'accent' : 'neutral'"
+              class="cursor-pointer"
+              @click="toggleMultiple(opt.id)"
+            >
+              {{ opt.label }}
+            </TagBadge>
+          </div>
+
+          <textarea
+            v-else
+            v-model="draft!.value"
+            class="mt-[26px] min-h-[120px] w-full max-w-[52ch] rounded-md bg-surface p-3.5 text-sm"
+            placeholder="Facultatif — laissez vide si non concerné"
+          />
+
           <div class="mt-auto flex items-center gap-3 pt-8">
-            <BaseButton variant="secondary" @click="router.back()">Retour</BaseButton>
-            <BaseButton variant="primary" @click="router.push('/app')">Continuer</BaseButton>
-            <span class="ml-auto text-xs text-ink/50">Entrée pour valider</span>
+            <BaseButton variant="secondary" @click="goBack">Retour</BaseButton>
+            <BaseButton variant="primary" :disabled="!canContinue || submitting" @click="goNext">
+              {{ submitting ? 'Enregistrement…' : (currentIndex === total - 1 ? 'Terminer' : 'Continuer') }}
+            </BaseButton>
           </div>
         </div>
 
         <div class="flex flex-col bg-surface px-11 py-[52px]">
           <EyebrowLabel muted>Où vous en êtes</EyebrowLabel>
-          <div class="mt-4 flex flex-col gap-3.5">
+          <div class="mt-4 flex flex-col gap-3.5 overflow-auto">
             <div
-              v-for="step in progressSteps"
-              :key="step.label"
+              v-for="(q, i) in questions"
+              :key="q.id"
               class="flex items-center gap-3"
-              :class="step.state === 'pending' ? 'opacity-50' : ''"
+              :class="stepState(i) === 'pending' ? 'opacity-50' : ''"
             >
               <span
                 class="grid h-[22px] w-[22px] flex-none place-items-center rounded-full text-[11px]"
                 :class="
-                  step.state === 'done'
+                  stepState(i) === 'done'
                     ? 'bg-accent text-bg'
-                    : step.state === 'current'
+                    : stepState(i) === 'current'
                       ? 'border-2 border-accent text-accent'
                       : 'border-2 border-ink/20'
                 "
-              >{{ step.state === 'done' ? '✓' : '' }}</span>
-              <span class="flex-1 text-sm" :class="step.state === 'current' ? 'font-semibold' : ''">{{ step.label }}</span>
-              <span v-if="step.meta" class="text-xs text-ink/50">{{ step.meta }}</span>
+              >{{ stepState(i) === 'done' ? '✓' : '' }}</span>
+              <span class="flex-1 text-sm" :class="stepState(i) === 'current' ? 'font-semibold' : ''">{{ q.label }}</span>
+              <span v-if="stepMeta(q)" class="text-xs text-ink/50">{{ stepMeta(q) }}</span>
             </div>
           </div>
 

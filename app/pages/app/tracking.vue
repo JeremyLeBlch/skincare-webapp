@@ -1,5 +1,6 @@
 <script setup lang="ts">
-const suivi = useSuivi()
+const { suivi } = await useSuivi()
+const { account } = await useAccount()
 
 const rangeOptions = [
   { label: 'Mois', value: 'month' },
@@ -9,10 +10,27 @@ const rangeOptions = [
 const range = ref('12w')
 
 const weekdayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+
+const moodPoints = computed(() => {
+  const trend = suivi.value?.moodTrend ?? []
+  if (trend.length < 2) return ''
+  const step = 320 / (trend.length - 1)
+  return trend.map((t, i) => `${Math.round(i * step)},${15 + (t.value - 1) * 60}`).join(' ')
+})
+
+const exporting = ref(false)
+async function onExport() {
+  exporting.value = true
+  try {
+    await exportAccountData()
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col lg:min-h-0">
+  <div v-if="suivi" class="flex flex-1 flex-col lg:min-h-0">
     <!-- Mobile (< lg) -->
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="flex items-baseline justify-between px-[22px] pt-3.5">
@@ -81,34 +99,45 @@ const weekdayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
       <div class="col-span-2 flex min-h-0 flex-col border-r border-ink/16 p-6">
         <div class="flex items-end justify-between">
           <div>
-            <EyebrowLabel>Trétinoïne 0,025 % · semaine 4 sur 12</EyebrowLabel>
-            <h2 class="mt-2 font-heading text-[32px] font-normal">Léa · peau mixte, acné légère</h2>
+            <EyebrowLabel>{{ account?.treatmentProgressLabel }}</EyebrowLabel>
+            <h2 class="mt-2 font-heading text-[32px] font-normal">
+              {{ account?.firstName }}<template v-if="account?.skinTags.length"> · {{ account.skinTags.map((t) => t.label).join(', ') }}</template>
+            </h2>
           </div>
           <div class="flex items-center gap-3">
             <SegmentedControl v-model="range" name="range" :options="rangeOptions" />
-            <BaseButton variant="secondary">Exporter pour mon dermato</BaseButton>
+            <BaseButton variant="secondary" :disabled="exporting" @click="onExport">
+              {{ exporting ? 'Export…' : 'Exporter pour mon dermato' }}
+            </BaseButton>
           </div>
         </div>
 
-        <div class="mt-5 grid grid-cols-8 gap-2.5">
+        <div v-if="suivi.strip.length" class="mt-5 grid grid-cols-8 gap-2.5">
           <div v-for="s in suivi.strip" :key="s.label">
-            <div class="h-[112px] rounded-[20px]" :style="{ background: s.shade }" />
+            <div
+              class="h-[112px] rounded-[20px] bg-cover bg-center"
+              :style="s.photoUrl ? { backgroundImage: `url(${s.photoUrl})` } : 'background: #d6cab5'"
+            />
             <div class="mt-1.5 text-[11px] text-ink/50">{{ s.label }}</div>
           </div>
         </div>
+        <InfoNote v-else class="mt-5">
+          Vos photos apparaîtront ici au fil de vos entrées quotidiennes.
+        </InfoNote>
 
         <div class="mt-6 flex min-h-0 flex-1 gap-6">
           <div class="flex flex-1 flex-col">
-            <EyebrowLabel>Sévérité déclarée vs. attendue</EyebrowLabel>
+            <EyebrowLabel>Ma peau ressentie au fil des jours</EyebrowLabel>
             <div class="relative mt-3 min-h-[160px] flex-1 rounded-lg bg-surface p-3.5">
-              <svg viewBox="0 0 320 150" preserveAspectRatio="none" class="absolute inset-3.5" style="width: calc(100% - 28px); height: calc(100% - 28px)">
-                <polyline points="0,20 40,26 80,44 120,30 160,58 200,66 240,84 280,92 320,104" fill="none" stroke="#2f5741" stroke-width="3" stroke-linecap="round" />
-                <polyline points="0,24 40,34 80,46 120,56 160,64 200,74 240,84 280,94 320,102" fill="none" stroke="#8a5a3b" stroke-width="2" stroke-dasharray="6 7" opacity=".7" />
+              <svg v-if="moodPoints" viewBox="0 0 320 150" preserveAspectRatio="none" class="absolute inset-3.5" style="width: calc(100% - 28px); height: calc(100% - 28px)">
+                <polyline :points="moodPoints" fill="none" stroke="#2f5741" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
+              <p v-else class="absolute inset-3.5 flex items-center text-[12.5px] text-ink/50">
+                Renseignez « Aujourd'hui, ma peau est… » dans vos entrées pour voir cette courbe.
+              </p>
             </div>
             <div class="mt-2.5 flex gap-4 text-[11px] font-semibold text-ink/60">
-              <span class="flex items-center gap-1.5"><span class="h-[3px] w-3.5 rounded-full bg-accent" />Vos notes</span>
-              <span class="flex items-center gap-1.5"><span class="h-0.5 w-3.5 bg-accent-2" />Courbe attendue</span>
+              <span class="flex items-center gap-1.5"><span class="h-[3px] w-3.5 rounded-full bg-accent" />Mieux → moins bien, d'après vos entrées</span>
             </div>
           </div>
 
