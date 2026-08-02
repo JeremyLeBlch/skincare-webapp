@@ -8,6 +8,15 @@ export interface TrackingCell {
   date: string | null
   state: CellState
   hasPhoto: boolean
+  /** Thumbnail shown inside the cell — the face shot when there is one. */
+  photoUrl: string | null
+}
+
+/** A metric with a bar: taken / due, as a percentage. */
+export interface TrackingStat {
+  label: string
+  value: string
+  percent: number
 }
 
 export interface Milestone {
@@ -45,7 +54,10 @@ export interface TrackingData {
   strip: TrackingPhoto[]
   startPhoto: TrackingPhoto | null
   latestPhoto: TrackingPhoto | null
-  adherence: { label: string; value: string }[]
+  /** One row per product: how often it was actually taken. */
+  treatmentStats: TrackingStat[]
+  /** The totals for the whole treatment so far. */
+  summary: { label: string; value: string }[]
   moodTrend: { label: string; value: number }[]
   adviceCards: { kicker: string; title: string; body: string; meta: string }[]
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PhotoAngle } from '~/composables/useEntry'
-import type { TrackingPhoto } from '~/composables/useTracking'
+import type { TrackingCell, TrackingPhoto } from '~/composables/useTracking'
 
 const { tracking, refresh } = await useTracking()
 const { account } = await useAccount()
@@ -19,6 +19,20 @@ const importHasPhoto = ref(false)
 const importPickDate = ref(false)
 const importing = ref(false)
 const importError = ref<string | null>(null)
+
+// Opening a day from the calendar shows its photos full size; adding one is a
+// step taken from inside that view, not instead of it.
+const viewerOpen = ref(false)
+const viewerDate = ref<string | null>(null)
+const viewerLabel = ref<string | null>(null)
+const viewer = ref<{ reload: () => Promise<void> } | null>(null)
+
+function openDay(cell: TrackingCell) {
+  if (!cell.date) return
+  viewerDate.value = cell.date
+  viewerLabel.value = `J${cell.day}`
+  viewerOpen.value = true
+}
 
 /** Without a date, the sheet asks for one (any day since the treatment started). */
 function openImport(date: string | null = null, label: string | null = null, hasPhoto = false, angle: PhotoAngle = 'face') {
@@ -44,7 +58,7 @@ async function onImportPhoto(file: File) {
   importError.value = null
   try {
     await saveEntryPhoto(importDate.value, importAngle.value, file)
-    await refresh()
+    await Promise.all([refresh(), viewer.value?.reload() ?? Promise.resolve()])
     importOpen.value = false
   } catch {
     importError.value = "L'import a échoué. Vérifiez votre connexion et réessayez."
@@ -105,18 +119,24 @@ async function onExport() {
               v-for="(cell, i) in tracking.cells"
               :key="i"
               type="button"
-              class="relative grid aspect-square cursor-pointer place-items-center rounded-full text-[10px] font-semibold disabled:cursor-default"
+              class="relative grid aspect-square cursor-pointer place-items-center overflow-hidden rounded-[10px] bg-cover bg-center text-[10px] font-semibold disabled:cursor-default"
               :class="{
-                'bg-accent text-bg': cell.state === 'full',
-                'bg-accent-300 text-ink': cell.state === 'partial',
-                'bg-neutral-300 text-ink/50': cell.state === 'missed',
+                'ring-2 ring-accent': cell.state === 'full',
+                'ring-2 ring-accent-300': cell.state === 'partial',
+                'bg-neutral-300 text-ink/50': cell.state === 'missed' && !cell.photoUrl,
                 'border border-ink/16': cell.state === 'empty',
+                'bg-accent text-bg': cell.state === 'full' && !cell.photoUrl,
+                'bg-accent-300 text-ink': cell.state === 'partial' && !cell.photoUrl,
               }"
+              :style="cell.photoUrl ? { backgroundImage: `url('${cell.photoUrl}')` } : undefined"
               :disabled="!cell.date"
-              @click="openImport(cell.date, `J${cell.day}`, cell.hasPhoto)"
+              @click="openDay(cell)"
             >
-              {{ cell.day }}
-              <span v-if="cell.hasPhoto" class="absolute bottom-[3px] h-1 w-1 rounded-full bg-current opacity-70" />
+              <!-- Over a photo the number needs its own backdrop to stay legible. -->
+              <span v-if="cell.photoUrl" class="absolute right-0.5 bottom-0.5 rounded-full bg-bg/85 px-1 text-[9px] text-ink/70">
+                {{ cell.day }}
+              </span>
+              <template v-else>{{ cell.day }}</template>
             </button>
           </div>
           <div class="mt-3.5 flex gap-3.5 text-[10px] font-semibold text-ink/60">
@@ -125,7 +145,7 @@ async function onExport() {
             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-neutral-300" />Manqué</span>
           </div>
           <p class="mt-2.5 text-[11px] leading-relaxed text-ink/55">
-            Touchez un jour — même passé — pour ajouter sa photo ou remplir ses notes.
+            Touchez un jour — même passé — pour voir ses photos en grand, les compléter ou écrire ses notes.
           </p>
         </div>
 
@@ -198,35 +218,46 @@ async function onExport() {
           </div>
         </div>
 
-        <EyebrowLabel class="mt-[22px]">Ma peau ressentie au fil des jours</EyebrowLabel>
-        <div class="relative mt-3 h-[150px] rounded-lg bg-surface p-3.5">
+        <EyebrowLabel class="mt-[22px]">Traitement pris</EyebrowLabel>
+        <div class="mt-3 flex flex-col gap-3">
+          <div v-for="stat in tracking.treatmentStats" :key="stat.label">
+            <div class="mb-1 flex justify-between text-[13px]">
+              <span>{{ stat.label }}</span>
+              <span class="font-semibold">{{ stat.value }}</span>
+            </div>
+            <div class="h-2 rounded-full bg-neutral-300">
+              <div class="h-full rounded-full bg-accent" :style="{ width: stat.percent + '%' }" />
+            </div>
+          </div>
+          <InfoNote v-if="!tracking.treatmentStats.length">
+            Ajoutez vos produits dans « Mon traitement » pour suivre ce que vous prenez.
+          </InfoNote>
+        </div>
+
+        <EyebrowLabel class="mt-[22px]">Résumé</EyebrowLabel>
+        <div class="mt-3 grid grid-cols-2 gap-2.5">
+          <div v-for="row in tracking.summary" :key="row.label" class="rounded-lg bg-surface p-3">
+            <div class="text-[10.5px] font-semibold text-ink/50">{{ row.label }}</div>
+            <div class="font-heading text-[19px] font-normal">{{ row.value }}</div>
+          </div>
+        </div>
+
+        <EyebrowLabel class="mt-[22px]">Peau ressentie</EyebrowLabel>
+        <div class="relative mt-3 h-[70px] rounded-lg bg-surface p-2.5">
           <svg
             v-if="moodPoints"
             viewBox="0 0 320 150"
             preserveAspectRatio="none"
-            class="absolute inset-3.5"
-            style="width: calc(100% - 28px); height: calc(100% - 28px)"
+            class="absolute inset-2.5"
+            style="width: calc(100% - 20px); height: calc(100% - 20px)"
           >
-            <polyline :points="moodPoints" fill="none" stroke="#2f5741" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline :points="moodPoints" fill="none" stroke="#2f5741" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
-          <p v-else class="text-[12.5px] leading-relaxed text-ink/50">
-            Renseignez « Aujourd'hui, ma peau est… » dans vos entrées pour voir cette courbe.
+          <p v-else class="text-[11.5px] leading-snug text-ink/50">
+            Renseignez « ma peau est… » dans vos entrées pour voir cette courbe.
           </p>
         </div>
-        <div class="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-ink/60">
-          <span class="h-[3px] w-3.5 rounded-full bg-accent" />Mieux → moins bien, d'après vos entrées
-        </div>
-
-        <EyebrowLabel class="mt-[22px]">Observance</EyebrowLabel>
-        <div class="mt-3 flex flex-col gap-2.5">
-          <div v-for="a in tracking.adherence" :key="a.label" class="flex justify-between text-[13.5px]">
-            <span>{{ a.label }}</span>
-            <span class="font-semibold">{{ a.value }}</span>
-          </div>
-        </div>
-        <div class="mt-3 rounded-lg bg-surface p-3.5 text-[12.5px] leading-relaxed">
-          Série actuelle : <strong>{{ tracking.streak }} jours</strong>. Record : {{ tracking.record }} jours.
-        </div>
+        <div class="mt-1.5 text-[10px] font-semibold text-ink/55">Mieux → moins bien, d'après vos entrées</div>
 
         <EyebrowLabel class="mt-[22px]">Ce qu'on vous conseille cette semaine</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-3">
@@ -286,38 +317,91 @@ async function onExport() {
           Vos photos apparaîtront ici au fil de vos entrées — vous pouvez aussi importer celles des jours passés.
         </InfoNote>
 
-        <div class="mt-6 flex min-h-0 flex-1 gap-6">
+        <!-- The calendar leads here too: the month of thumbnails is the page. -->
+        <div class="mt-6 flex min-h-0 flex-1 gap-6 overflow-auto">
           <div class="flex flex-1 flex-col">
-            <EyebrowLabel>Ma peau ressentie au fil des jours</EyebrowLabel>
-            <div class="relative mt-3 min-h-[160px] flex-1 rounded-lg bg-surface p-3.5">
-              <svg v-if="moodPoints" viewBox="0 0 320 150" preserveAspectRatio="none" class="absolute inset-3.5" style="width: calc(100% - 28px); height: calc(100% - 28px)">
-                <polyline :points="moodPoints" fill="none" stroke="#2f5741" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              <p v-else class="absolute inset-3.5 flex items-center text-[12.5px] text-ink/50">
-                Renseignez « Aujourd'hui, ma peau est… » dans vos entrées pour voir cette courbe.
-              </p>
-            </div>
-            <div class="mt-2.5 flex gap-4 text-[11px] font-semibold text-ink/60">
-              <span class="flex items-center gap-1.5"><span class="h-[3px] w-3.5 rounded-full bg-accent" />Mieux → moins bien, d'après vos entrées</span>
+            <EyebrowLabel>Mon calendrier</EyebrowLabel>
+            <div class="mt-3 rounded-lg bg-surface p-4">
+              <div class="grid grid-cols-7 gap-2">
+                <div v-for="d in weekdayLabels" :key="d" class="text-center text-[11px] text-ink/45">{{ d }}</div>
+                <button
+                  v-for="(cell, i) in tracking.cells"
+                  :key="i"
+                  type="button"
+                  class="relative grid aspect-square cursor-pointer place-items-center overflow-hidden rounded-md bg-cover bg-center text-[11px] font-semibold disabled:cursor-default"
+                  :class="{
+                    'ring-2 ring-accent': cell.state === 'full',
+                    'ring-2 ring-accent-300': cell.state === 'partial',
+                    'bg-neutral-300 text-ink/50': cell.state === 'missed' && !cell.photoUrl,
+                    'border border-ink/16': cell.state === 'empty',
+                    'bg-accent text-bg': cell.state === 'full' && !cell.photoUrl,
+                    'bg-accent-300 text-ink': cell.state === 'partial' && !cell.photoUrl,
+                  }"
+                  :style="cell.photoUrl ? { backgroundImage: `url('${cell.photoUrl}')` } : undefined"
+                  :disabled="!cell.date"
+                  @click="openDay(cell)"
+                >
+                  <span v-if="cell.photoUrl" class="absolute right-1 bottom-1 rounded-full bg-bg/85 px-1.5 text-[10px] text-ink/70">
+                    {{ cell.day }}
+                  </span>
+                  <template v-else>{{ cell.day }}</template>
+                </button>
+              </div>
+              <div class="mt-3.5 flex gap-4 text-[11px] font-semibold text-ink/60">
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-accent" />Photo + note</span>
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-accent-300" />Partiel</span>
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-neutral-300" />Manqué</span>
+                <span class="ml-auto text-ink/45">Cliquez un jour pour l'ouvrir en grand</span>
+              </div>
             </div>
           </div>
 
           <div class="w-[300px] flex-none">
-            <EyebrowLabel>Observance</EyebrowLabel>
+            <EyebrowLabel>Traitement pris</EyebrowLabel>
             <div class="mt-3.5 flex flex-col gap-3">
-              <div v-for="a in tracking.adherence" :key="a.label" class="flex justify-between text-sm">
-                <span>{{ a.label }}</span>
-                <span class="font-semibold">{{ a.value }}</span>
+              <div v-for="stat in tracking.treatmentStats" :key="stat.label">
+                <div class="mb-1 flex justify-between text-[13px]">
+                  <span>{{ stat.label }}</span>
+                  <span class="font-semibold">{{ stat.value }}</span>
+                </div>
+                <div class="h-2 rounded-full bg-neutral-300">
+                  <div class="h-full rounded-full bg-accent" :style="{ width: stat.percent + '%' }" />
+                </div>
               </div>
+              <InfoNote v-if="!tracking.treatmentStats.length">
+                Ajoutez vos produits dans « Mon traitement » pour suivre ce que vous prenez.
+              </InfoNote>
             </div>
-            <div class="mt-[18px] rounded-lg bg-surface p-4 text-[12.5px] leading-relaxed">
-              Série actuelle : <strong>{{ tracking.streak }} jours</strong>. Record : {{ tracking.record }} jours.
+
+            <EyebrowLabel class="mt-6">Résumé</EyebrowLabel>
+            <div class="mt-3.5 grid grid-cols-2 gap-2.5">
+              <div v-for="row in tracking.summary" :key="row.label" class="rounded-lg bg-surface p-3">
+                <div class="text-[10.5px] font-semibold text-ink/50">{{ row.label }}</div>
+                <div class="font-heading text-[19px] font-normal">{{ row.value }}</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div class="flex flex-col gap-3.5 overflow-auto p-6">
+        <EyebrowLabel>Peau ressentie</EyebrowLabel>
+        <div class="relative h-[90px] rounded-lg bg-surface p-3">
+          <svg
+            v-if="moodPoints"
+            viewBox="0 0 320 150"
+            preserveAspectRatio="none"
+            class="absolute inset-3"
+            style="width: calc(100% - 24px); height: calc(100% - 24px)"
+          >
+            <polyline :points="moodPoints" fill="none" stroke="#2f5741" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <p v-else class="text-[11.5px] leading-snug text-ink/50">
+            Renseignez « ma peau est… » dans vos entrées pour voir cette courbe.
+          </p>
+        </div>
+        <div class="-mt-1.5 text-[10.5px] font-semibold text-ink/55">Mieux → moins bien, d'après vos entrées</div>
+
         <EyebrowLabel>Ce qu'on vous conseille cette semaine</EyebrowLabel>
         <AdviceCard v-for="card in tracking.adviceCards" :key="card.title" v-bind="card" />
         <hr class="border-t border-ink/16">
@@ -329,6 +413,14 @@ async function onExport() {
         </p>
       </div>
     </div>
+
+    <DayViewer
+      ref="viewer"
+      v-model:open="viewerOpen"
+      :date="viewerDate"
+      :label="viewerLabel"
+      @add-photo="openImport(viewerDate, viewerLabel, $event.replacing, $event.angle)"
+    />
 
     <PhotoSourceSheet
       v-model:open="importOpen"
