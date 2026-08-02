@@ -6,15 +6,12 @@ const { save } = await useEntry()
 
 const angles = ['Face', 'Profil G', 'Profil D']
 const angle = ref('Face')
-const fileInput = ref<HTMLInputElement | null>(null)
+const cameraInput = ref<HTMLInputElement | null>(null)
+const libraryInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const photoError = ref<string | null>(null)
 
 const angleKey = computed(() => ({ Face: 'photoFace', 'Profil G': 'photoLeft', 'Profil D': 'photoRight' })[angle.value] as 'photoFace' | 'photoLeft' | 'photoRight')
-
-function openCamera() {
-  fileInput.value?.click()
-}
 
 async function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
@@ -62,17 +59,27 @@ async function onFileSelected(event: Event) {
         </div>
 
         <div class="flex items-center justify-between">
-          <div class="h-[52px] w-[52px] flex-none rounded-[18px]" style="background: rgba(247, 242, 233, 0.2)" />
+          <!-- The other way in: a photo already taken, from the phone's gallery. -->
+          <button
+            type="button"
+            class="grid h-[52px] w-[52px] flex-none cursor-pointer place-items-center rounded-[18px] text-center text-[9px] font-semibold leading-tight disabled:opacity-50"
+            style="background: rgba(247, 242, 233, 0.2)"
+            :disabled="uploading"
+            @click="libraryInput?.click()"
+          >
+            Importer
+          </button>
           <button
             type="button"
             class="grid h-[78px] w-[78px] cursor-pointer place-items-center rounded-full border-[3px] disabled:opacity-50"
             style="border-color: #f7f2e9"
             :disabled="uploading"
-            @click="openCamera"
+            @click="cameraInput?.click()"
           >
             <span class="h-[62px] w-[62px] rounded-full" style="background: #f7f2e9" />
           </button>
-          <input ref="fileInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onFileSelected">
+          <input ref="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onFileSelected">
+          <input ref="libraryInput" type="file" accept="image/*" class="hidden" @change="onFileSelected">
           <span v-if="uploading" class="absolute bottom-[110px] left-1/2 -translate-x-1/2 text-[11px] font-semibold">Envoi…</span>
           <div class="flex w-[52px] flex-col items-center gap-1 text-[10px] font-semibold">
             <span class="text-lg">◐</span>

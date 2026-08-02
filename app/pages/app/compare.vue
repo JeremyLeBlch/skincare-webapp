@@ -94,11 +94,8 @@ const handleLeft = computed(() => `${pos.value}%`)
           Ajoutez au moins deux photos pour cet angle afin de voir la comparaison avant / après.
         </InfoNote>
 
-        <div v-if="tracking?.strip.length" class="mt-3.5 grid grid-cols-8 gap-2">
-          <div v-for="s in tracking.strip" :key="s.label">
-            <div class="h-[66px] rounded-md bg-cover bg-center" :style="s.photoUrl ? { backgroundImage: `url('${s.photoUrl}')` } : 'background: #d6cab5'" />
-            <div class="mt-1 text-[11px] text-ink/50">{{ s.label }}</div>
-          </div>
+        <div v-if="tracking?.strip.length" class="mt-3.5 flex flex-wrap gap-2.5">
+          <DayPhotos v-for="s in tracking.strip" :key="s.date" :day="s" tile="h-[66px] w-[50px]" :interactive="false" />
         </div>
       </div>
 

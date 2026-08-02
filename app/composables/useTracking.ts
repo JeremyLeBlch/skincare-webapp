@@ -1,8 +1,13 @@
+import type { PhotoAngle } from './useEntry'
+
 export type CellState = 'full' | 'partial' | 'missed' | 'empty'
 
 export interface TrackingCell {
   day: number | null
+  /** Y-m-d, or null for days still to come. */
+  date: string | null
   state: CellState
+  hasPhoto: boolean
 }
 
 export interface Milestone {
@@ -11,12 +16,28 @@ export interface Milestone {
   note?: string
 }
 
+/** One angle actually photographed on a given day. */
+export interface TrackingAnglePhoto {
+  angle: PhotoAngle
+  /** Face · Profil G · Profil D */
+  label: string
+  photoUrl: string
+}
+
 export interface TrackingPhoto {
   label: string
+  date: string
+  /** The day's representative shot — face when there is one. */
   photoUrl?: string | null
+  /** Which angle `photoUrl` shows. */
+  angleLabel?: string | null
+  photos: TrackingAnglePhoto[]
 }
 
 export interface TrackingData {
+  /** Bounds for filing a photo on a past day (Y-m-d). */
+  startDate: string
+  today: string
   streak: number
   record: number
   cells: TrackingCell[]

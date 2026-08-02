@@ -1,11 +1,64 @@
 <script setup lang="ts">
+import type { PhotoAngle } from '~/composables/useEntry'
 import type { TrackingPhoto } from '~/composables/useTracking'
 
-const { tracking } = await useTracking()
+const { tracking, refresh } = await useTracking()
 const { account } = await useAccount()
 
 function photoStyle(photo: TrackingPhoto | null | undefined, fallback: string) {
   return photo?.photoUrl ? { backgroundImage: `url("${photo.photoUrl}")` } : { background: fallback }
+}
+
+// Filing a photo on a day already gone by: the user shot it at the time but
+// never uploaded it, or is catching up on a whole week at once.
+const importOpen = ref(false)
+const importDate = ref('')
+const importLabel = ref<string | null>(null)
+const importAngle = ref<PhotoAngle>('face')
+const importHasPhoto = ref(false)
+const importPickDate = ref(false)
+const importing = ref(false)
+const importError = ref<string | null>(null)
+
+/** Without a date, the sheet asks for one (any day since the treatment started). */
+function openImport(date: string | null = null, label: string | null = null, hasPhoto = false, angle: PhotoAngle = 'face') {
+  importDate.value = date ?? tracking.value?.today ?? ''
+  importLabel.value = label
+  importPickDate.value = date === null
+  importHasPhoto.value = hasPhoto
+  importAngle.value = angle
+  importError.value = null
+  importOpen.value = true
+}
+
+const importSubtitle = computed(() => {
+  const day = new Date(`${importDate.value}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  return importHasPhoto.value
+    ? `${day} — la photo importée remplacera celle de cet angle.`
+    : `${day} — prenez-la maintenant ou importez celle que vous avez déjà.`
+})
+
+async function onImportPhoto(file: File) {
+  importing.value = true
+  importError.value = null
+  try {
+    await saveEntryPhoto(importDate.value, importAngle.value, file)
+    await refresh()
+    importOpen.value = false
+  } catch {
+    importError.value = "L'import a échoué. Vérifiez votre connexion et réessayez."
+  } finally {
+    importing.value = false
+  }
+}
+
+/**
+ * A photo is rarely the whole story: the same day still wants its mood, its
+ * symptoms and its note. The entry form takes a date, so it opens on that day.
+ */
+function openEntryForm() {
+  navigateTo({ path: '/app/entry', query: { date: importDate.value } })
 }
 
 const rangeOptions = [
@@ -48,25 +101,32 @@ async function onExport() {
         <div class="rounded-lg bg-surface p-[18px]">
           <div class="grid grid-cols-7 gap-1.5">
             <div v-for="d in weekdayLabels" :key="d" class="text-center text-[11px] text-ink/45">{{ d }}</div>
-            <div
+            <button
               v-for="(cell, i) in tracking.cells"
               :key="i"
-              class="grid aspect-square place-items-center rounded-full text-[10px] font-semibold"
+              type="button"
+              class="relative grid aspect-square cursor-pointer place-items-center rounded-full text-[10px] font-semibold disabled:cursor-default"
               :class="{
                 'bg-accent text-bg': cell.state === 'full',
                 'bg-accent-300 text-ink': cell.state === 'partial',
                 'bg-neutral-300 text-ink/50': cell.state === 'missed',
                 'border border-ink/16': cell.state === 'empty',
               }"
+              :disabled="!cell.date"
+              @click="openImport(cell.date, `J${cell.day}`, cell.hasPhoto)"
             >
               {{ cell.day }}
-            </div>
+              <span v-if="cell.hasPhoto" class="absolute bottom-[3px] h-1 w-1 rounded-full bg-current opacity-70" />
+            </button>
           </div>
           <div class="mt-3.5 flex gap-3.5 text-[10px] font-semibold text-ink/60">
             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-accent" />Photo + note</span>
             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-accent-300" />Partiel</span>
             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-neutral-300" />Manqué</span>
           </div>
+          <p class="mt-2.5 text-[11px] leading-relaxed text-ink/55">
+            Touchez un jour — même passé — pour ajouter sa photo ou remplir ses notes.
+          </p>
         </div>
 
         <div v-if="tracking.startPhoto" class="mt-3.5 flex gap-2.5">
@@ -76,6 +136,7 @@ async function onExport() {
           >
             <span class="rounded-full bg-bg/85 px-2 py-[3px] text-[10px] font-semibold text-ink/60">
               Départ · {{ tracking.startPhoto.label }}
+              <template v-if="tracking.startPhoto.angleLabel"> · {{ tracking.startPhoto.angleLabel }}</template>
             </span>
           </div>
           <div
@@ -85,6 +146,7 @@ async function onExport() {
           >
             <span class="rounded-full bg-bg/85 px-2 py-[3px] text-[10px] font-semibold text-ink/60">
               Auj. · {{ tracking.latestPhoto.label }}
+              <template v-if="tracking.latestPhoto.angleLabel"> · {{ tracking.latestPhoto.angleLabel }}</template>
             </span>
           </div>
           <div v-else class="grid h-[130px] flex-1 place-items-center rounded-lg border-2 border-dashed border-ink/20 p-2.5 text-center text-[10px] font-semibold text-ink/45">
@@ -96,15 +158,26 @@ async function onExport() {
         </InfoNote>
         <BaseButton variant="secondary" block class="mt-2.5" :disabled="!tracking.startPhoto" @click="$router.push('/app/compare')">Comparer en grand</BaseButton>
 
-        <template v-if="tracking.strip.length">
-          <EyebrowLabel class="mt-[22px]">Mes photos</EyebrowLabel>
-          <div class="mt-3 flex gap-2.5 overflow-x-auto pb-1">
-            <div v-for="s in tracking.strip" :key="s.label" class="w-[84px] flex-none">
-              <div class="h-[110px] rounded-lg bg-cover bg-center" :style="photoStyle(s, '#d6cab5')" />
-              <div class="mt-1.5 text-[11px] text-ink/50">{{ s.label }}</div>
-            </div>
+        <EyebrowLabel class="mt-[22px]">Mes photos</EyebrowLabel>
+        <div class="mt-3 flex gap-3 overflow-x-auto pb-1">
+          <DayPhotos
+            v-for="s in tracking.strip"
+            :key="s.date"
+            :day="s"
+            @pick="openImport(s.date, s.label, true, $event)"
+          />
+          <div class="w-[84px] flex-none">
+            <button
+              type="button"
+              class="grid h-[110px] w-full cursor-pointer place-items-center gap-1 rounded-lg border-2 border-dashed border-ink/20 text-ink/50"
+              @click="openImport()"
+            >
+              <span class="font-heading text-[22px] font-normal text-accent">+</span>
+              <span class="text-[10px] font-semibold">Ajouter</span>
+            </button>
+            <div class="mt-1.5 text-[11px] text-ink/50">Un autre jour</div>
           </div>
-        </template>
+        </div>
 
         <EyebrowLabel class="mt-[22px]">Jalons</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-2">
@@ -139,23 +212,35 @@ async function onExport() {
           </div>
           <div class="flex items-center gap-3">
             <SegmentedControl v-model="range" name="range" :options="rangeOptions" />
+            <BaseButton variant="secondary" @click="openImport()">Ajouter une photo</BaseButton>
             <BaseButton variant="secondary" :disabled="exporting" @click="onExport">
               {{ exporting ? 'Export…' : 'Exporter pour mon dermato' }}
             </BaseButton>
           </div>
         </div>
 
-        <div v-if="tracking.strip.length" class="mt-5 grid grid-cols-8 gap-2.5">
-          <div v-for="s in tracking.strip" :key="s.label">
-            <div
-              class="h-[112px] rounded-[20px] bg-cover bg-center"
-              :style="photoStyle(s, '#d6cab5')"
-            />
-            <div class="mt-1.5 text-[11px] text-ink/50">{{ s.label }}</div>
+        <div class="mt-5 flex flex-wrap gap-3">
+          <DayPhotos
+            v-for="s in tracking.strip"
+            :key="s.date"
+            :day="s"
+            tile="h-[112px] w-[80px]"
+            @pick="openImport(s.date, s.label, true, $event)"
+          />
+          <div class="w-[80px]">
+            <button
+              type="button"
+              class="grid h-[112px] w-full cursor-pointer place-items-center gap-1 rounded-lg border-2 border-dashed border-ink/20 text-ink/50"
+              @click="openImport()"
+            >
+              <span class="font-heading text-[22px] font-normal text-accent">+</span>
+              <span class="text-[11px] font-semibold">Ajouter</span>
+            </button>
+            <div class="mt-1.5 text-[11px] text-ink/50">Jour au choix</div>
           </div>
         </div>
-        <InfoNote v-else class="mt-5">
-          Vos photos apparaîtront ici au fil de vos entrées quotidiennes.
+        <InfoNote v-if="!tracking.strip.length" class="mt-2.5">
+          Vos photos apparaîtront ici au fil de vos entrées — vous pouvez aussi importer celles des jours passés.
         </InfoNote>
 
         <div class="mt-6 flex min-h-0 flex-1 gap-6">
@@ -201,5 +286,47 @@ async function onExport() {
         </p>
       </div>
     </div>
+
+    <PhotoSourceSheet
+      v-model:open="importOpen"
+      :title="importLabel ?? 'Ajouter une photo'"
+      :subtitle="importSubtitle"
+      :busy="importing"
+      @select="onImportPhoto"
+    >
+      <div v-if="importPickDate" class="mt-3.5">
+        <label class="mb-1.5 block text-xs font-semibold">Jour de la photo</label>
+        <input
+          v-model="importDate"
+          type="date"
+          :min="tracking.startDate"
+          :max="tracking.today"
+          class="w-full rounded-md bg-surface p-3 text-sm"
+        >
+      </div>
+
+      <EyebrowLabel class="mt-3.5">Angle</EyebrowLabel>
+      <SegmentedControl
+        :model-value="importAngle"
+        name="import-angle"
+        :options="PHOTO_ANGLES"
+        block
+        class="mt-2"
+        @update:model-value="importAngle = $event as PhotoAngle"
+      />
+
+      <InfoNote v-if="importError" tone="accent-2" class="mt-3">{{ importError }}</InfoNote>
+
+      <template #footer>
+        <button
+          type="button"
+          class="mt-3 w-full cursor-pointer rounded-md bg-surface py-2.5 text-center text-[12.5px] font-semibold disabled:opacity-45"
+          :disabled="importing"
+          @click="openEntryForm"
+        >
+          Remplir les notes de ce jour
+        </button>
+      </template>
+    </PhotoSourceSheet>
   </div>
 </template>

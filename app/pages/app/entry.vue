@@ -1,8 +1,20 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'blank' })
+import type { PhotoAngle } from '~/composables/useEntry'
+
+// Keyed on the full path so opening another day remounts the form instead of
+// keeping the previous day's answers in the local refs below.
+definePageMeta({ layout: 'blank', key: (route) => route.fullPath })
 
 const router = useRouter()
-const { entry, save } = await useEntry()
+const route = useRoute()
+
+// `?date=YYYY-MM-DD` fills in a day already gone by, reached from the tracking
+// calendar. Without it, the form is today's.
+const date = typeof route.query.date === 'string' ? route.query.date : null
+const { entry, save } = await useEntry(date)
+
+/** Back to where the form was opened from. */
+const exitTo = date ? '/app/tracking' : '/app'
 
 const moodOptions = [
   { label: 'Mieux', value: 'better' },
@@ -22,28 +34,33 @@ function toggleSymptom(label: string) {
 
 const note = ref(entry.value?.note ?? '')
 
-const faceInput = ref<HTMLInputElement | null>(null)
-const leftInput = ref<HTMLInputElement | null>(null)
-const rightInput = ref<HTMLInputElement | null>(null)
-const uploadingAngle = ref<string | null>(null)
+const pickerOpen = ref(false)
+const pickerAngle = ref<PhotoAngle>('face')
+const uploadingAngle = ref<PhotoAngle | null>(null)
 const photoError = ref<string | null>(null)
 
-async function onAnglePhoto(angle: 'photoFace' | 'photoLeft' | 'photoRight', event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
+const angleLabels: Record<PhotoAngle, string> = { face: 'Face', left: 'Profil gauche', right: 'Profil droit' }
+const payloadKeys = { face: 'photoFace', left: 'photoLeft', right: 'photoRight' } as const
+
+function openPicker(angle: PhotoAngle) {
+  pickerAngle.value = angle
+  photoError.value = null
+  pickerOpen.value = true
+}
+
+async function onAnglePhoto(file: File) {
+  const angle = pickerAngle.value
 
   uploadingAngle.value = angle
   photoError.value = null
   try {
-    await save({ [angle]: file })
+    await save({ [payloadKeys[angle]]: file })
   } catch {
+    // Surfaced on the page itself, next to the tiles the sheet came from.
     photoError.value = "L'envoi de la photo a échoué. Vérifiez votre connexion et réessayez."
   } finally {
     uploadingAngle.value = null
-    // Let the same file be picked again after a failure — without this the
-    // input keeps its value and re-selecting it fires no `change` event.
-    input.value = ''
+    pickerOpen.value = false
   }
 }
 
@@ -53,17 +70,17 @@ async function submit() {
   saving.value = true
   try {
     await save({ mood: mood.value as 'better' | 'same' | 'worse', symptoms: selectedSymptoms.value, note: note.value })
-    router.push('/app')
+    router.push(exitTo)
   } finally {
     saving.value = false
   }
 }
 
-async function skipToday() {
+async function skipDay() {
   saving.value = true
   try {
     await save({ skipped: true })
-    router.push('/app')
+    router.push(exitTo)
   } finally {
     saving.value = false
   }
@@ -75,27 +92,35 @@ async function skipToday() {
     <!-- Mobile (< lg) -->
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="flex items-center gap-3 px-[22px] pt-3">
-        <button type="button" class="grid h-[38px] w-[38px] flex-none place-items-center rounded-full border border-ink/16" @click="router.push('/app')">✕</button>
+        <button type="button" class="grid h-[38px] w-[38px] flex-none place-items-center rounded-full border border-ink/16" @click="router.push(exitTo)">✕</button>
         <div class="flex-1">
-          <div class="font-heading text-lg font-normal">Entrée du jour</div>
+          <div class="font-heading text-lg font-normal">
+            {{ entry?.isToday ? 'Entrée du jour' : `Entrée du J${entry?.dayNumber}` }}
+          </div>
+          <div v-if="entry && !entry.isToday" class="text-[11.5px] font-semibold text-ink/55">{{ entry.dateLabel }}</div>
         </div>
-        <BaseButton variant="ghost" :disabled="saving" @click="skipToday">Ignorer</BaseButton>
+        <BaseButton variant="ghost" :disabled="saving" @click="skipDay">Ignorer</BaseButton>
       </div>
 
       <div class="flex gap-2.5 px-[22px] pt-4">
-        <div
+        <button
+          type="button"
           class="flex h-[180px] flex-1 items-end justify-start rounded-lg bg-cover bg-center p-2.5 text-[10px] font-semibold text-ink/55"
           :style="entry?.photos.face ? { backgroundImage: `url('${entry.photos.face}')` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
+          :disabled="uploadingAngle === 'face'"
+          @click="openPicker('face')"
         >
-          Face · aujourd'hui
-        </div>
+          <span class="rounded-full bg-bg/85 px-2 py-[3px]">
+            {{ entry?.photos.face ? `Face · ${entry.isToday ? "aujourd'hui" : `J${entry.dayNumber}`}` : '+ Face' }}
+          </span>
+        </button>
         <div class="flex w-[92px] flex-col gap-2.5">
           <button
             type="button"
             class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 bg-cover bg-center text-center text-[10px] font-semibold text-ink/45"
             :style="entry?.photos.left ? { backgroundImage: `url('${entry.photos.left}')` } : ''"
-            :disabled="uploadingAngle === 'photoLeft'"
-            @click="leftInput?.click()"
+            :disabled="uploadingAngle === 'left'"
+            @click="openPicker('left')"
           >
             {{ entry?.photos.left ? '' : '+ Profil G' }}
           </button>
@@ -103,17 +128,14 @@ async function skipToday() {
             type="button"
             class="grid flex-1 place-items-center rounded-[20px] border-2 border-dashed border-ink/20 bg-cover bg-center text-center text-[10px] font-semibold text-ink/45"
             :style="entry?.photos.right ? { backgroundImage: `url('${entry.photos.right}')` } : ''"
-            :disabled="uploadingAngle === 'photoRight'"
-            @click="rightInput?.click()"
+            :disabled="uploadingAngle === 'right'"
+            @click="openPicker('right')"
           >
             {{ entry?.photos.right ? '' : '+ Profil D' }}
           </button>
         </div>
       </div>
       <InfoNote v-if="photoError" tone="accent-2" class="mx-[22px] mt-2.5">{{ photoError }}</InfoNote>
-      <input ref="faceInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoFace', $event)">
-      <input ref="leftInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoLeft', $event)">
-      <input ref="rightInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onAnglePhoto('photoRight', $event)">
 
       <div class="flex-1 overflow-auto px-[22px] pt-5 pb-6">
         <EyebrowLabel>Aujourd'hui, ma peau est…</EyebrowLabel>
@@ -154,9 +176,13 @@ async function skipToday() {
           <BrandMark :size="30" />
           Skincare Planning
         </NuxtLink>
-        <span class="text-sm font-semibold text-ink/50">Entrée du jour</span>
+        <span class="text-sm font-semibold text-ink/50">
+          {{ entry?.isToday ? 'Entrée du jour' : `Entrée du J${entry?.dayNumber} · ${entry?.dateLabel}` }}
+        </span>
         <div class="ml-auto flex items-center gap-3">
-          <BaseButton variant="ghost" :disabled="saving" @click="skipToday">Ignorer aujourd'hui</BaseButton>
+          <BaseButton variant="ghost" :disabled="saving" @click="skipDay">
+            {{ entry?.isToday ? "Ignorer aujourd'hui" : 'Ignorer ce jour' }}
+          </BaseButton>
           <BaseButton variant="primary" :disabled="saving" @click="submit">
             {{ saving ? 'Enregistrement…' : 'Enregistrer la journée' }}
           </BaseButton>
@@ -167,7 +193,7 @@ async function skipToday() {
         <div class="flex min-h-0 flex-col border-r border-ink/16 p-7">
           <div class="flex items-baseline justify-between">
             <EyebrowLabel>Photos du jour · {{ [entry?.photos.face, entry?.photos.left, entry?.photos.right].filter(Boolean).length }} sur 3</EyebrowLabel>
-            <span class="text-sm text-ink/50">Cliquez pour importer</span>
+            <span class="text-sm text-ink/50">Cliquez pour prendre ou importer une photo</span>
           </div>
 
           <div class="mt-3.5 grid min-h-0 flex-1 grid-cols-[2fr_1fr] gap-3.5">
@@ -175,7 +201,7 @@ async function skipToday() {
               type="button"
               class="flex items-end justify-end rounded-lg bg-cover bg-center p-2.5"
               :style="entry?.photos.face ? { backgroundImage: `url('${entry.photos.face}')` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
-              @click="faceInput?.click()"
+              @click="openPicker('face')"
             >
               <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[10px] font-semibold text-ink/55">Face</span>
             </button>
@@ -184,7 +210,7 @@ async function skipToday() {
                 type="button"
                 class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 bg-cover bg-center text-ink/50"
                 :style="entry?.photos.left ? { backgroundImage: `url('${entry.photos.left}')` } : ''"
-                @click="leftInput?.click()"
+                @click="openPicker('left')"
               >
                 <template v-if="!entry?.photos.left">
                   <span class="font-heading text-[22px] font-normal text-accent">+</span>
@@ -195,7 +221,7 @@ async function skipToday() {
                 type="button"
                 class="grid flex-1 place-items-center gap-1.5 rounded-lg border-2 border-dashed border-ink/20 bg-cover bg-center text-ink/50"
                 :style="entry?.photos.right ? { backgroundImage: `url('${entry.photos.right}')` } : ''"
-                @click="rightInput?.click()"
+                @click="openPicker('right')"
               >
                 <template v-if="!entry?.photos.right">
                   <span class="font-heading text-[22px] font-normal text-accent">+</span>
@@ -246,5 +272,13 @@ async function skipToday() {
         </div>
       </div>
     </div>
+
+    <PhotoSourceSheet
+      v-model:open="pickerOpen"
+      :title="`Photo · ${angleLabels[pickerAngle]}`"
+      subtitle="Prenez-la maintenant, ou importez celle que vous avez déjà faite."
+      :busy="uploadingAngle !== null"
+      @select="onAnglePhoto"
+    />
   </div>
 </template>
