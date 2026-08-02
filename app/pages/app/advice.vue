@@ -21,7 +21,23 @@ async function onApply() {
     <div class="flex flex-1 flex-col lg:hidden">
       <div class="flex items-center gap-3 px-[22px] pt-3">
         <NuxtLink to="/app" class="grid h-[38px] w-[38px] flex-none place-items-center rounded-full border border-ink/16">←</NuxtLink>
-        <span class="text-[11.5px] font-semibold text-ink/50">Fiche conseil</span>
+        <span class="flex-1 text-[11.5px] font-semibold text-ink/50">Fiche conseil</span>
+        <!-- The only way to the ingredient library from a phone: it is absent
+             from the bottom bar, which is full. -->
+        <NuxtLink to="/app/ingredients" class="text-[11.5px] font-semibold text-accent">Ingrédients →</NuxtLink>
+      </div>
+
+      <!-- The other cards written for this profile, as a scrollable row. -->
+      <div v-if="advice.related.length" class="mt-3 flex gap-1.5 overflow-x-auto px-[22px] pb-1">
+        <NuxtLink
+          v-for="item in advice.related"
+          :key="item.slug"
+          :to="{ path: '/app/advice', query: { slug: item.slug } }"
+          class="flex-none rounded-full px-3.5 py-2 text-[12.5px] whitespace-nowrap"
+          :class="item.active ? 'bg-accent font-semibold text-bg' : 'bg-surface text-ink'"
+        >
+          {{ item.label }}
+        </NuxtLink>
       </div>
 
       <div class="flex-1 overflow-auto px-[22px] pt-[18px] pb-6">
@@ -30,8 +46,8 @@ async function onApply() {
         <div class="text-[11.5px] text-ink/50">{{ advice.subtitle }}</div>
         <p class="mt-3.5 text-sm leading-relaxed">{{ advice.intro }}</p>
 
-        <div class="my-3.5 flex gap-2.5">
-          <div v-for="stat in advice.stats.slice(0, 2)" :key="stat.label" class="flex-1 rounded-lg bg-surface p-3.5">
+        <div class="my-3.5 grid grid-cols-2 gap-2.5">
+          <div v-for="stat in advice.stats" :key="stat.label" class="rounded-lg bg-surface p-3.5">
             <div class="text-[11.5px] font-semibold text-ink/50">{{ stat.label }}</div>
             <div class="font-heading text-[22px] font-normal">{{ stat.value }}</div>
           </div>
@@ -41,6 +57,30 @@ async function onApply() {
           <div class="font-heading text-[17px] font-normal">{{ advice.sandwichRule.title }}</div>
           <p class="mt-1 text-sm leading-relaxed">{{ advice.sandwichRule.body }}</p>
         </div>
+
+        <div class="mt-4">
+          <div class="font-heading text-[17px] font-normal">{{ advice.stopWarning.title }}</div>
+          <p class="mt-1 text-[13.5px] leading-relaxed">{{ advice.stopWarning.body }}</p>
+        </div>
+
+        <EyebrowLabel class="mt-5">Appliquer à mon traitement</EyebrowLabel>
+        <div class="mt-3 flex flex-col gap-2 rounded-lg bg-surface p-[18px]">
+          <div class="text-[10px] tracking-wide text-accent uppercase">{{ advice.suggestion.kicker }}</div>
+          <div class="font-heading text-[17px] font-normal leading-tight">{{ advice.suggestion.title }}</div>
+          <p class="text-[13px] text-ink/80">{{ advice.suggestion.body }}</p>
+          <BaseButton variant="primary" block class="mt-1.5" :disabled="applying" @click="onApply">
+            {{ applying ? 'Application…' : 'Appliquer' }}
+          </BaseButton>
+        </div>
+
+        <template v-if="advice.relatedProduct">
+          <EyebrowLabel muted class="mt-5">Concerné dans votre routine</EyebrowLabel>
+          <div class="mt-3 flex items-center gap-3 rounded-lg bg-surface p-3.5">
+            <div class="h-11 w-11 flex-none rounded-md" style="background: linear-gradient(140deg, #e0d5c4, #c9bda8)" />
+            <div class="text-[13.5px] font-semibold">{{ advice.relatedProduct }}</div>
+          </div>
+        </template>
+        <p v-if="advice.relatedNote" class="mt-2.5 text-[12.5px] leading-relaxed text-ink/65">{{ advice.relatedNote }}</p>
 
         <div class="mt-5 border-t border-ink/16 pt-3.5">
           <EyebrowLabel muted>Sources</EyebrowLabel>

@@ -197,6 +197,49 @@ async function onExport() {
             </div>
           </div>
         </div>
+
+        <EyebrowLabel class="mt-[22px]">Ma peau ressentie au fil des jours</EyebrowLabel>
+        <div class="relative mt-3 h-[150px] rounded-lg bg-surface p-3.5">
+          <svg
+            v-if="moodPoints"
+            viewBox="0 0 320 150"
+            preserveAspectRatio="none"
+            class="absolute inset-3.5"
+            style="width: calc(100% - 28px); height: calc(100% - 28px)"
+          >
+            <polyline :points="moodPoints" fill="none" stroke="#2f5741" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <p v-else class="text-[12.5px] leading-relaxed text-ink/50">
+            Renseignez « Aujourd'hui, ma peau est… » dans vos entrées pour voir cette courbe.
+          </p>
+        </div>
+        <div class="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-ink/60">
+          <span class="h-[3px] w-3.5 rounded-full bg-accent" />Mieux → moins bien, d'après vos entrées
+        </div>
+
+        <EyebrowLabel class="mt-[22px]">Observance</EyebrowLabel>
+        <div class="mt-3 flex flex-col gap-2.5">
+          <div v-for="a in tracking.adherence" :key="a.label" class="flex justify-between text-[13.5px]">
+            <span>{{ a.label }}</span>
+            <span class="font-semibold">{{ a.value }}</span>
+          </div>
+        </div>
+        <div class="mt-3 rounded-lg bg-surface p-3.5 text-[12.5px] leading-relaxed">
+          Série actuelle : <strong>{{ tracking.streak }} jours</strong>. Record : {{ tracking.record }} jours.
+        </div>
+
+        <EyebrowLabel class="mt-[22px]">Ce qu'on vous conseille cette semaine</EyebrowLabel>
+        <div class="mt-3 flex flex-col gap-3">
+          <AdviceCard v-for="card in tracking.adviceCards" :key="card.title" v-bind="card" />
+        </div>
+
+        <BaseButton variant="secondary" block class="mt-[22px]" :disabled="exporting" @click="onExport">
+          {{ exporting ? 'Export…' : 'Exporter pour mon dermato' }}
+        </BaseButton>
+        <p class="mt-3 text-[11.5px] leading-relaxed text-ink/60">
+          Ces conseils sont issus de publications relues et référencées en bas de chaque fiche. Ils ne remplacent pas
+          votre dermatologue — l'export reprend photos, notes et observance pour votre prochaine consultation.
+        </p>
       </div>
     </div>
 

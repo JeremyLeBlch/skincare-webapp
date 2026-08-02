@@ -24,7 +24,9 @@ async function onToggleTask(id: number) {
       </div>
 
       <div class="px-[22px] pt-5">
-        <div class="text-[11.5px] font-semibold text-ink/50">{{ today.dateLabel }} · Jour {{ today.dayNumber }}</div>
+        <div class="text-[11.5px] font-semibold text-ink/50">
+          {{ today.dateLabel }} · Jour {{ today.dayNumber }} · {{ today.weekLabel }}
+        </div>
         <h2 class="mt-1 font-heading text-[32px] font-normal">Bonjour {{ today.userName }}</h2>
       </div>
 
@@ -32,7 +34,7 @@ async function onToggleTask(id: number) {
         <StreakCard :streak="today.streak" :days="today.days" />
       </div>
 
-      <div class="flex-1 px-[22px] pt-[22px] pb-6">
+      <div class="flex-1 overflow-auto px-[22px] pt-[22px] pb-6">
         <EyebrowLabel>À faire aujourd'hui</EyebrowLabel>
         <DailyChecklist :items="today.tasks" @toggle="onToggleTask" />
 
@@ -41,6 +43,27 @@ async function onToggleTask(id: number) {
         </InfoNote>
 
         <BaseButton variant="primary" block class="mt-3.5" @click="router.push('/app/capture')">Prendre la photo du jour</BaseButton>
+
+        <EyebrowLabel class="mt-[22px]">Derniers jours</EyebrowLabel>
+        <RecentDaysStrip class="mt-3" :days="today.recentDays" />
+
+        <EyebrowLabel class="mt-[22px]">Prochain jalon</EyebrowLabel>
+        <MilestoneCard
+          class="mt-3"
+          :title="today.milestone.title"
+          :body="today.milestone.body"
+          :link-label="today.milestone.linkLabel"
+          :link-to="today.milestone.linkTo"
+        />
+
+        <EyebrowLabel class="mt-[22px]">Pour vous aujourd'hui</EyebrowLabel>
+        <div class="mt-3 flex flex-col gap-3">
+          <AdviceCard v-for="card in today.adviceCards" :key="card.title" v-bind="card" />
+        </div>
+
+        <EyebrowLabel muted class="mt-[22px]">Mon traitement</EyebrowLabel>
+        <TreatmentTable class="mt-3" :items="today.treatment" />
+        <BaseButton variant="secondary" block class="mt-3" @click="router.push('/app/profile')">Modifier mon traitement</BaseButton>
       </div>
     </div>
 

@@ -154,6 +154,13 @@ async function skipDay() {
           </TagBadge>
         </div>
 
+        <template v-if="entry?.tasks.length">
+          <EyebrowLabel class="mt-5">Traitement suivi ce soir</EyebrowLabel>
+          <div class="mt-2.5 flex flex-col gap-2.5">
+            <ChecklistItem v-for="item in entry.tasks" :key="item.id" :label="item.label" :done="item.done" />
+          </div>
+        </template>
+
         <div class="mt-5">
           <label class="mb-1.5 block text-xs font-semibold">Note libre</label>
           <textarea v-model="note" class="min-h-[86px] w-full rounded-md bg-surface p-3.5 text-sm" />

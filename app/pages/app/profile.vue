@@ -36,27 +36,50 @@ function onAlternate() {
         <h3 class="font-heading text-[25px] font-normal">Mon traitement</h3>
         <span class="text-[11.5px] font-semibold text-ink/50">{{ treatment.productCount }} produits</span>
       </div>
+      <div class="px-[22px] text-[11.5px] text-ink/50">{{ treatment.startedLabel }}</div>
 
       <div class="flex-1 overflow-auto px-[22px] pt-4 pb-6">
         <EyebrowLabel>Matin · {{ treatment.morning.length }} étapes</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-2.5">
           <ProductRow v-for="p in treatment.morning" :key="p.id" v-bind="p" removable @remove="removeProduct(p.id)" />
         </div>
+        <AddProductCard title="Ajouter au matin" subtitle="Nom et fréquence" @add="onAdd('morning', $event)" />
 
         <EyebrowLabel class="mt-[22px]">Soir · {{ treatment.evening.length }} étapes</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-2.5">
           <ProductRow v-for="p in treatment.evening" :key="p.id" v-bind="p" removable @remove="removeProduct(p.id)" />
         </div>
+        <AddProductCard title="Ajouter au soir" subtitle="Nom et fréquence" @add="onAdd('evening', $event)" />
 
-        <AddProductCard title="Ajouter un produit" subtitle="Nom et fréquence" @add="onAdd('evening', $event)" />
+        <EyebrowLabel class="mt-[22px]">Vérifications</EyebrowLabel>
+        <div class="mt-3 flex flex-col gap-2.5">
+          <InfoNote v-if="treatment.interactionWarning" tone="accent-2">
+            <strong>{{ treatment.interactionWarning.title }}</strong> {{ treatment.interactionWarning.body }}
+            <div class="mt-2.5 flex gap-2.5">
+              <BaseButton variant="primary" class="text-[13px]" @click="onAlternate">Alterner</BaseButton>
+              <BaseButton variant="secondary" class="text-[13px]" @click="dismissWarning">Ignorer</BaseButton>
+            </div>
+          </InfoNote>
+          <InfoNote v-if="treatment.photoprotectionNote">
+            <strong>Photoprotection.</strong> {{ treatment.photoprotectionNote }}
+          </InfoNote>
+          <InfoNote v-if="treatment.guide">
+            <strong>{{ treatment.guide.title }}.</strong> {{ treatment.guide.advice }}
+          </InfoNote>
+        </div>
 
-        <InfoNote v-if="treatment.interactionWarning" tone="accent-2" class="mt-3.5">
-          <strong>{{ treatment.interactionWarning.title }}</strong> {{ treatment.interactionWarning.body }}
-          <div class="mt-2.5 flex gap-2.5">
-            <BaseButton variant="primary" class="text-[13px]" @click="onAlternate">Alterner</BaseButton>
-            <BaseButton variant="secondary" class="text-[13px]" @click="dismissWarning">Ignorer</BaseButton>
+        <EyebrowLabel muted class="mt-[22px]">Rythme de la semaine</EyebrowLabel>
+        <div class="mt-3 flex flex-col gap-2.5">
+          <div
+            v-for="d in treatment.weeklySchedule"
+            :key="d.day"
+            class="flex justify-between text-[13.5px]"
+            :class="d.active ? '' : 'text-ink/50'"
+          >
+            <span>{{ d.day }}</span>
+            <span :class="d.active ? 'font-semibold' : ''">{{ d.label }}</span>
           </div>
-        </InfoNote>
+        </div>
       </div>
     </div>
 

@@ -12,6 +12,14 @@ watch(ingredients, (list) => {
 function toggleFilter(key: string) {
   activeCategory.value = activeCategory.value === key ? null : key
 }
+
+// A phone has no room for the desktop master/detail split, so the card opens
+// in place instead — otherwise the whole ingredient sheet is unreachable there.
+const expandedSlug = ref<string | null>(null)
+
+function toggleDetail(slug: string) {
+  expandedSlug.value = expandedSlug.value === slug ? null : slug
+}
 </script>
 
 <template>
@@ -50,6 +58,47 @@ function toggleFilter(key: string) {
             <div class="mt-0.5 text-[11.5px] text-ink/50">{{ ing.subtitle }}</div>
             <p class="mt-1.5 text-[12.5px] leading-relaxed">{{ ing.body }}</p>
             <div v-if="ing.meta" class="mt-2 text-[10.5px] text-ink/45">{{ ing.meta }}</div>
+
+            <template v-if="ing.detail">
+              <button
+                type="button"
+                class="mt-2.5 cursor-pointer text-[12px] font-semibold text-accent"
+                @click="toggleDetail(ing.slug)"
+              >
+                {{ expandedSlug === ing.slug ? 'Masquer la fiche' : 'Voir la fiche complète' }}
+              </button>
+
+              <div v-if="expandedSlug === ing.slug" class="mt-3 border-t border-ink/16 pt-3">
+                <p class="text-[12.5px] leading-relaxed">{{ ing.detail.description }}</p>
+
+                <div class="mt-3 grid grid-cols-2 gap-2.5">
+                  <div v-for="stat in ing.detail.stats" :key="stat.label" class="rounded-md bg-bg p-3">
+                    <div class="text-[11px] font-semibold text-ink/50">{{ stat.label }}</div>
+                    <div class="font-heading text-[19px] font-normal">{{ stat.value }}</div>
+                  </div>
+                </div>
+
+                <h5 class="mt-3.5 font-heading text-[15px] font-normal">Se marie avec</h5>
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
+                  <TagBadge v-for="item in ing.detail.pairsWith" :key="item" variant="accent">{{ item }}</TagBadge>
+                </div>
+
+                <h5 class="mt-3 font-heading text-[15px] font-normal">Prudence avec</h5>
+                <div class="mt-1.5 flex flex-wrap gap-1.5">
+                  <TagBadge v-for="item in ing.detail.cautionWith" :key="item" variant="accent-2">{{ item }}</TagBadge>
+                </div>
+
+                <div class="mt-3.5 border-t border-ink/16 pt-3">
+                  <EyebrowLabel muted>Sources</EyebrowLabel>
+                  <ol class="mt-2 list-decimal space-y-1.5 pl-5 text-[12px] leading-relaxed text-ink/70">
+                    <li v-for="source in ing.detail.sources" :key="source.text">
+                      {{ source.text }} <a href="#" class="font-semibold text-accent-2">{{ source.link }}</a>
+                    </li>
+                  </ol>
+                  <div class="mt-2 text-[10.5px] text-ink/50">{{ ing.detail.reviewedNote }}</div>
+                </div>
+              </div>
+            </template>
           </div>
           <InfoNote v-if="!ingredients.length">Aucun ingrédient ne correspond à cette recherche.</InfoNote>
         </div>

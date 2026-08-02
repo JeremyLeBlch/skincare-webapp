@@ -172,16 +172,18 @@ async function handleLogout() {
 
     <!-- Main tab content -->
     <div class="flex-1 overflow-auto px-6 py-7 lg:px-9 lg:py-7">
-      <div class="flex items-center gap-5">
+      <div class="flex flex-wrap items-center gap-4 sm:gap-5">
         <span
           class="h-[84px] w-[84px] flex-none rounded-full bg-cover bg-center"
           :style="account.avatarUrl ? { backgroundImage: `url('${account.avatarUrl}')` } : 'background: linear-gradient(140deg, #e0d5c4, #c9bda8)'"
         />
-        <div class="flex-1">
+        <div class="min-w-0 flex-1">
           <h1 class="font-heading text-[32px] font-normal lg:text-[40px]">{{ account.firstName }} {{ account.lastName }}</h1>
           <div class="mt-1 text-xs text-ink/50">{{ account.memberSinceLabel }} · {{ account.streak }} jours de série</div>
         </div>
-        <BaseButton variant="secondary" class="hidden sm:inline-flex" :disabled="avatarUploading" @click="avatarInput?.click()">
+        <!-- Wraps to its own line on a phone rather than hiding: changing the
+             avatar is precisely what one does from a phone. -->
+        <BaseButton variant="secondary" class="flex-none" :disabled="avatarUploading" @click="avatarInput?.click()">
           {{ avatarUploading ? 'Envoi…' : 'Changer la photo' }}
         </BaseButton>
         <input ref="avatarInput" type="file" accept="image/*" class="hidden" @change="onAvatarSelected">

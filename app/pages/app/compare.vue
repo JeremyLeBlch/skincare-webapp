@@ -23,6 +23,9 @@ const handleLeft = computed(() => `${pos.value}%`)
         <span class="text-[11.5px] font-semibold text-ink/50">{{ compare?.startLabel }} → {{ compare?.todayLabel }}</span>
       </div>
 
+      <!-- Without this, a phone could only ever compare the face shots. -->
+      <SegmentedControl v-model="angle" name="angle-mobile" :options="angleOptions" block class="mx-[22px] mt-3" />
+
       <div v-if="compare?.startPhotoUrl && compare?.latestPhotoUrl" class="relative mx-[22px] mt-4 h-[390px] overflow-hidden rounded-lg" style="background: #d6cab5">
         <div class="absolute inset-0 flex items-start justify-end bg-cover bg-center p-2.5" :style="{ backgroundImage: `url('${compare.latestPhotoUrl}')` }">
           <span class="rounded-full bg-bg/90 px-3 py-[5px] text-[11px] font-semibold">Aujourd'hui · {{ compare.todayLabel }}</span>
@@ -44,6 +47,13 @@ const handleLeft = computed(() => `${pos.value}%`)
       </InfoNote>
 
       <div class="flex-1 overflow-auto px-[22px] pt-[18px] pb-6">
+        <template v-if="tracking?.strip.length">
+          <EyebrowLabel>Mes photos</EyebrowLabel>
+          <div class="mt-3 mb-[18px] flex gap-3 overflow-x-auto pb-1">
+            <DayPhotos v-for="s in tracking.strip" :key="s.date" :day="s" tile="h-[86px] w-[64px]" :interactive="false" />
+          </div>
+        </template>
+
         <EyebrowLabel>Ce qui a changé</EyebrowLabel>
         <div class="mt-3 flex flex-col gap-3">
           <div v-for="metric in compare?.metrics ?? []" :key="metric.label">
